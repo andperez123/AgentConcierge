@@ -1,0 +1,338 @@
+:root {
+  --bg: #0f1115;
+  --surface: #1a1d24;
+  --surface2: #242830;
+  --text: #f2f4f8;
+  --muted: #8b93a7;
+  --accent: #f97316;
+  --accent-dim: #c2410c;
+  --online: #22c55e;
+  --degraded: #eab308;
+  --offline: #ef4444;
+  --border: #2e3440;
+  font-family:
+    "SF Pro Display",
+    system-ui,
+    -apple-system,
+    sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: manipulation;
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+  border: none;
+  border-radius: 12px;
+  min-height: 48px;
+  padding: 12px 20px;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  max-width: 1024px;
+  margin: 0 auto;
+  padding: 16px 20px 20px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.clock {
+  font-size: 2.5rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.date {
+  color: var(--muted);
+  font-size: 1rem;
+  margin-top: 4px;
+}
+
+.api-dot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: var(--muted);
+  padding-top: 8px;
+}
+
+.api-dot span.bullet {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--offline);
+}
+
+.api-dot.ok span.bullet {
+  background: var(--online);
+}
+
+.status-card {
+  flex: 1;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  margin-bottom: 12px;
+  position: relative;
+  overflow: hidden;
+}
+
+.status-card.online {
+  border-color: color-mix(in srgb, var(--online) 40%, var(--border));
+}
+
+.status-card.degraded {
+  border-color: color-mix(in srgb, var(--degraded) 40%, var(--border));
+}
+
+.status-card.offline {
+  border-color: color-mix(in srgb, var(--offline) 40%, var(--border));
+}
+
+.status-label {
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+}
+
+.status-title {
+  font-size: 2rem;
+  font-weight: 700;
+  margin: 8px 0;
+}
+
+.status-badge {
+  display: inline-block;
+  font-size: 1.25rem;
+  font-weight: 700;
+  padding: 6px 14px;
+  border-radius: 999px;
+  margin-bottom: 12px;
+}
+
+.status-badge.online {
+  background: color-mix(in srgb, var(--online) 20%, transparent);
+  color: var(--online);
+}
+
+.status-badge.degraded {
+  background: color-mix(in srgb, var(--degraded) 20%, transparent);
+  color: var(--degraded);
+}
+
+.status-badge.offline {
+  background: color-mix(in srgb, var(--offline) 20%, transparent);
+  color: var(--offline);
+}
+
+.status-meta {
+  color: var(--muted);
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.system-strip {
+  background: var(--surface2);
+  border-radius: 14px;
+  padding: 12px 16px;
+  font-size: 0.9rem;
+  color: var(--muted);
+  margin-bottom: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  align-items: center;
+}
+
+.touch-btn {
+  background: var(--accent);
+  color: #111;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.touch-btn:active {
+  background: var(--accent-dim);
+}
+
+.touch-ripple {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    circle at var(--x, 50%) var(--y, 50%),
+    color-mix(in srgb, var(--accent) 25%, transparent) 0%,
+    transparent 60%
+  );
+  opacity: 0;
+  animation: ripple 0.5s ease-out;
+}
+
+@keyframes ripple {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.actions button.primary {
+  background: var(--accent);
+  color: #111;
+  font-weight: 600;
+}
+
+.actions button.secondary {
+  background: var(--surface2);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.detail-page,
+.logs-page {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  padding: 16px 20px;
+  max-width: 1024px;
+  margin: 0 auto;
+}
+
+.back-btn {
+  align-self: flex-start;
+  background: var(--surface2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  margin-bottom: 16px;
+  min-height: 44px;
+  padding: 8px 16px;
+}
+
+.detail-grid {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.detail-row {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+
+.detail-row label {
+  display: block;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+
+.detail-row value,
+.detail-row .value {
+  font-size: 1rem;
+  word-break: break-word;
+}
+
+.logs-box {
+  flex: 1;
+  background: #0a0c10;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  overflow: auto;
+  font-family: ui-monospace, monospace;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  color: #c8d0e0;
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 24px;
+}
+
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 24px;
+  max-width: 400px;
+  width: 100%;
+}
+
+.modal h2 {
+  margin: 0 0 12px;
+}
+
+.modal p {
+  color: var(--muted);
+  margin: 0 0 20px;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.modal-actions button {
+  flex: 1;
+}
+
+.mock-banner {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  font-size: 0.7rem;
+  background: var(--accent);
+  color: #111;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-weight: 700;
+}

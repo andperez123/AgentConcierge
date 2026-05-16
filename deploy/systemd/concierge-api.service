@@ -1,0 +1,19 @@
+[Unit]
+Description=Concierge API and dashboard
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=@CONCIERGE_USER@
+WorkingDirectory=/opt/concierge
+Environment=NODE_ENV=production
+Environment=PORT=3080
+Environment=MOCK_OPENCLAW=0
+Environment=CONCIERGE_DATA_DIR=/opt/concierge/data
+ExecStart=/usr/bin/node /opt/concierge/apps/api/dist/index.js
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

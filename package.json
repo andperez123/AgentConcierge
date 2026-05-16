@@ -1,0 +1,18 @@
+{
+  "name": "concierge",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w @concierge/api & npm run dev -w @concierge/dashboard",
+    "dev:api": "npm run dev -w @concierge/api",
+    "dev:dashboard": "npm run dev -w @concierge/dashboard",
+    "build": "npm run build -w @concierge/shared && npm run build -w @concierge/dashboard && npm run build -w @concierge/api",
+    "start": "npm run start -w @concierge/api"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

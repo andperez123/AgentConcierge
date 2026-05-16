@@ -1,0 +1,16 @@
+[Unit]
+Description=Concierge Chromium kiosk
+After=graphical.target concierge-api.service
+Requires=concierge-api.service
+
+[Service]
+Type=simple
+User=@CONCIERGE_USER@
+Environment=DISPLAY=:0
+Environment=XAUTHORITY=@CONCIERGE_HOME@/.Xauthority
+ExecStart=/opt/concierge/deploy/kiosk/launch-kiosk.sh
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=graphical.target
