@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { fetchLogs } from "../api";
+import ActionTile from "../components/ActionTile";
 
 export default function Logs() {
   const navigate = useNavigate();
@@ -26,22 +27,17 @@ export default function Logs() {
   }, [load]);
 
   return (
-    <div className="logs-page">
+    <div className="page-shell">
       <button type="button" className="back-btn" onClick={() => navigate("/")}>
         ← Back
       </button>
-      <h1>Gateway logs</h1>
-      {path && (
-        <p style={{ color: "var(--muted)", fontSize: "0.85rem" }}>{path}</p>
-      )}
-      <button
-        type="button"
-        className="secondary"
-        style={{ marginBottom: 12, alignSelf: "flex-start" }}
+      <h1 className="page-title">Gateway logs</h1>
+      {path && <p className="page-subtitle">{path}</p>}
+      <ActionTile
+        label={loading ? "Loading…" : "Refresh"}
+        variant="secondary"
         onClick={() => void load()}
-      >
-        {loading ? "Loading…" : "Refresh"}
-      </button>
+      />
       <pre className="logs-box">{lines.join("\n")}</pre>
     </div>
   );

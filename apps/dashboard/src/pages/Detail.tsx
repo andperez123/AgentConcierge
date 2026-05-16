@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { restartGateway, runDoctor } from "../api";
+import ActionTile from "../components/ActionTile";
 import { useOpenClawStatus } from "../hooks/useOpenClawStatus";
 
 export default function Detail() {
@@ -35,12 +36,12 @@ export default function Detail() {
   const s = status;
 
   return (
-    <div className="detail-page">
+    <div className="page-shell">
       <button type="button" className="back-btn" onClick={() => navigate("/")}>
         ← Back
       </button>
 
-      <h1>OpenClaw detail</h1>
+      <h1 className="page-title">OpenClaw detail</h1>
 
       <div className="detail-grid">
         <div className="detail-row">
@@ -97,40 +98,32 @@ export default function Detail() {
         </div>
       )}
 
-      <div className="actions" style={{ gridTemplateColumns: "1fr 1fr 1fr" }}>
-        <button
-          type="button"
-          className="primary"
+      <div className="actions-row" style={{ gridTemplateColumns: "1fr 1fr 1fr" }}>
+        <ActionTile
+          label={busy === "restart" ? "…" : "Safe restart"}
+          variant="primary"
           disabled={busy !== null}
           onClick={() => void handleRestart()}
-        >
-          {busy === "restart" ? "…" : "Safe restart"}
-        </button>
-        <button
-          type="button"
-          className="secondary"
+        />
+        <ActionTile
+          label="Force restart"
+          variant="secondary"
           disabled={busy !== null}
           onClick={() => void handleRestart(true)}
-        >
-          Force restart
-        </button>
-        <button
-          type="button"
-          className="secondary"
+        />
+        <ActionTile
+          label={busy === "doctor" ? "…" : "Doctor"}
+          variant="secondary"
           disabled={busy !== null}
           onClick={() => void handleDoctor()}
-        >
-          {busy === "doctor" ? "…" : "Doctor"}
-        </button>
+        />
       </div>
 
-      <div className="actions" style={{ marginTop: 10 }}>
-        <Link to="/logs" style={{ textDecoration: "none" }}>
-          <button type="button" className="secondary" style={{ width: "100%" }}>
-            View logs
-          </button>
-        </Link>
-      </div>
+      <ActionTile
+        label="View logs"
+        variant="secondary"
+        onClick={() => navigate("/logs")}
+      />
     </div>
   );
 }

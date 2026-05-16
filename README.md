@@ -16,6 +16,15 @@ There is no separate “connect to OpenClaw” URL to configure. If `openclaw ga
 
 On the Pi, `deploy/systemd/concierge-api.service` sets `MOCK_OPENCLAW=0`.
 
+## Dashboard features
+
+- Large clock + date (optimized for **1024×600** ELECROW touchscreen)
+- Weather via [Open-Meteo](https://open-meteo.com/) — set your city in **Settings** (gear icon)
+- OpenClaw gateway status card + restart / logs / doctor
+- Touch targets **~100px** tall for primary actions
+
+**First run:** open the dashboard → tap the gear → enter your city → Save.
+
 ## Develop on Mac
 
 ```bash
@@ -80,8 +89,14 @@ chmod +x deploy/install-pi.sh deploy/kiosk/launch-kiosk.sh
 Updates later (on the Pi):
 
 ```bash
-cd ~/Concierge && git pull && ./deploy/install-pi.sh
+cd ~/Concierge
+git pull
+./deploy/install-pi.sh
+sudo systemctl restart concierge-api
+sudo systemctl restart concierge-kiosk   # if kiosk is enabled
 ```
+
+**Kiosk Chromium fix:** if `chromium-browser` is not found, the install script uses `chromium` auto-detect in `deploy/kiosk/launch-kiosk.sh`.
 
 #### Option B — rsync over SSH
 

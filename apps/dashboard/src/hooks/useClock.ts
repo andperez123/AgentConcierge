@@ -12,11 +12,12 @@ export function useClock() {
     hour: "numeric",
     minute: "2-digit",
   });
+  const seconds = now.toLocaleTimeString([], { second: "2-digit" }).slice(-2);
   const date = now.toLocaleDateString([], {
     weekday: "long",
     month: "short",
     day: "numeric",
   });
 
-  return { time, date, now };
+  return { time, seconds, date, now };
 }

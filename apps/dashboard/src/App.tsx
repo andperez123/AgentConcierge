@@ -4,6 +4,7 @@ import { reportScreen } from "./api";
 import Home from "./pages/Home";
 import Detail from "./pages/Detail";
 import Logs from "./pages/Logs";
+import Settings from "./pages/Settings";
 
 export default function App() {
   useEffect(() => {
@@ -18,6 +19,7 @@ export default function App() {
       <Route path="/" element={<Home />} />
       <Route path="/openclaw" element={<Detail />} />
       <Route path="/logs" element={<Logs />} />
+      <Route path="/settings" element={<Settings />} />
     </Routes>
   );
 }

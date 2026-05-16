@@ -1,29 +1,27 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import {
-  fetchDeviceStatus,
-  fetchHealth,
-  restartGateway,
-  touchTest,
-} from "../api";
-import { useClock } from "../hooks/useClock";
+import { fetchHealth, restartGateway, touchTest } from "../api";
+import ActionTile from "../components/ActionTile";
+import ClockHero from "../components/ClockHero";
+import OpenClawTile from "../components/OpenClawTile";
+import WeatherCard from "../components/WeatherCard";
 import { useOpenClawStatus } from "../hooks/useOpenClawStatus";
-
-function secondsAgo(iso: string): number {
-  return Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
-}
+import { useWeather } from "../hooks/useWeather";
 
 export default function Home() {
-  const { time, date } = useClock();
   const { status, error, refresh } = useOpenClawStatus(5000);
+  const {
+    weather,
+    needsCity,
+    loading: weatherLoading,
+    refresh: refreshWeather,
+  } = useWeather();
   const navigate = useNavigate();
   const [apiOk, setApiOk] = useState(false);
   const [mock, setMock] = useState(false);
-  const [touchCount, setTouchCount] = useState(0);
-  const [screenLabel, setScreenLabel] = useState("");
   const [showRestart, setShowRestart] = useState(false);
   const [restarting, setRestarting] = useState(false);
-  const [ripple, setRipple] = useState<{ x: number; y: number } | null>(null);
+  const [debugMsg, setDebugMsg] = useState<string | null>(null);
 
   useEffect(() => {
     void fetchHealth()
@@ -32,29 +30,7 @@ export default function Home() {
         setMock(h.mock);
       })
       .catch(() => setApiOk(false));
-    void fetchDeviceStatus().then((d) => {
-      if (d.screen) {
-        setScreenLabel(`${d.screen.width}×${d.screen.height}`);
-      }
-    });
   }, []);
-
-  const state = status?.state ?? "offline";
-  const checkedSec = status ? secondsAgo(status.checkedAt) : null;
-
-  async function handleTouchTest(e: React.MouseEvent<HTMLButtonElement>) {
-    const card = e.currentTarget.closest(".status-card");
-    if (card) {
-      const cr = card.getBoundingClientRect();
-      setRipple({
-        x: ((e.clientX - cr.left) / cr.width) * 100,
-        y: ((e.clientY - cr.top) / cr.height) * 100,
-      });
-      setTimeout(() => setRipple(null), 500);
-    }
-    const res = await touchTest();
-    setTouchCount(res.count);
-  }
 
   async function confirmRestart() {
     setRestarting(true);
@@ -62,111 +38,83 @@ export default function Home() {
       await restartGateway();
       setShowRestart(false);
       await refresh(true);
+      await refreshWeather(true);
     } finally {
       setRestarting(false);
     }
   }
 
+  async function handleClockLongPress() {
+    const res = await touchTest();
+    setDebugMsg(`Touch OK · count ${res.count}`);
+    setTimeout(() => setDebugMsg(null), 3000);
+  }
+
   return (
-    <div className="app">
-      <header className="header">
-        <div>
-          <div className="clock">{time}</div>
-          <div className="date">{date}</div>
+    <div className="app-kiosk">
+      <header className="home-header">
+        <div className="home-top">
+          <ClockHero onLongPress={() => void handleClockLongPress()} />
+          <WeatherCard
+            weather={weather}
+            needsCity={needsCity}
+            loading={weatherLoading}
+          />
         </div>
-        <div className={`api-dot ${apiOk ? "ok" : ""}`}>
-          <span className="bullet" />
-          {apiOk ? "API OK" : "API down"}
+        <div className="home-header__tools">
+          <Link to="/settings" className="settings-btn" aria-label="Settings">
+            <svg
+              width="28"
+              height="28"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <circle cx="12" cy="12" r="3" />
+              <path d="M12 2v2M12 20v2M4 12H2M22 12h-2M5 5l1.4 1.4M17.6 17.6 19 19M5 19l1.4-1.4M17.6 6.4 19 5" />
+            </svg>
+          </Link>
+          <div className={`api-pill ${apiOk ? "api-pill--ok" : ""}`}>
+            <span className="api-pill__dot" />
+            {apiOk ? "API OK" : "API down"}
+          </div>
         </div>
       </header>
 
-      <Link
-        to="/openclaw"
-        className={`status-card ${state}`}
-        style={{ textDecoration: "none", color: "inherit" }}
-      >
-        {ripple && (
-          <div
-            className="touch-ripple"
-            style={{ "--x": `${ripple.x}%`, "--y": `${ripple.y}%` } as React.CSSProperties}
-          />
-        )}
-        {mock && <span className="mock-banner">MOCK</span>}
-        <span className="status-label">OpenClaw</span>
-        <div className={`status-badge ${state}`}>
-          {state === "online"
-            ? "ONLINE"
-            : state === "degraded"
-              ? "DEGRADED"
-              : "OFFLINE"}
-        </div>
-        <div className="status-title">Gateway</div>
-        <div className="status-meta">
-          {status?.probe.reachable
-            ? `Reachable · ${status.probe.capability ?? "connected"}`
-            : "Not reachable on loopback"}
-          <br />
-          {error
-            ? `Error: ${error}`
-            : checkedSec !== null
-              ? `Last check: ${checkedSec}s ago`
-              : "Checking…"}
-          {status?.lastRestartAt && (
-            <>
-              <br />
-              Last restart: {new Date(status.lastRestartAt).toLocaleString()}
-            </>
-          )}
-        </div>
-      </Link>
+      <OpenClawTile status={status} error={error} mock={mock} />
 
-      <div className="system-strip">
-        <span>
-          Display {screenLabel || `${screen.width}×${screen.height}`}
-        </span>
-        <span>Touch {touchCount > 0 ? `OK (${touchCount})` : "—"}</span>
-        <span>Poll 5s</span>
-        <button type="button" className="touch-btn" onClick={handleTouchTest}>
-          Tap to test
-        </button>
-      </div>
-
-      <div className="actions">
-        <button
-          type="button"
-          className="primary"
+      <div className="actions-row">
+        <ActionTile
+          label="Restart gateway"
+          variant="primary"
           onClick={() => setShowRestart(true)}
-        >
-          Restart gateway
-        </button>
-        <button
-          type="button"
-          className="secondary"
+        />
+        <ActionTile
+          label="View logs"
+          variant="secondary"
           onClick={() => navigate("/logs")}
-        >
-          View logs
-        </button>
+        />
       </div>
+
+      {debugMsg && <div className="debug-toast">{debugMsg}</div>}
 
       {showRestart && (
         <div className="modal-overlay">
           <div className="modal">
             <h2>Restart gateway?</h2>
-            <p>
-              Runs a safe restart on your Pi. Active work may delay restart
-              briefly.
-            </p>
+            <p>Safe restart on your Pi. Active work may delay briefly.</p>
             <div className="modal-actions">
               <button
                 type="button"
-                className="secondary"
+                className="action-tile action-tile--secondary"
                 onClick={() => setShowRestart(false)}
               >
                 Cancel
               </button>
               <button
                 type="button"
-                className="primary"
+                className="action-tile action-tile--primary"
                 disabled={restarting}
                 onClick={() => void confirmRestart()}
               >

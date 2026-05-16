@@ -16,6 +16,10 @@ db.exec(`
     exit_code INTEGER,
     message TEXT
   );
+  CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+  );
 `);
 
 export function recordRestart(

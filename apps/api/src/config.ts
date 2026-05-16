@@ -21,3 +21,6 @@ export const DATA_DIR =
 export const DASHBOARD_DIST =
   process.env.DASHBOARD_DIST ?? join(__dirname, "..", "..", "dashboard", "dist");
 export const STATUS_CACHE_MS = 2000;
+export const WEATHER_CACHE_MINUTES = Number(
+  process.env.WEATHER_CACHE_MINUTES ?? 15,
+);

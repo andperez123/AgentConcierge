@@ -1,9 +1,12 @@
 import type {
   ActionResponse,
+  AppSettings,
   DeviceStatus,
   HealthResponse,
   LogsResponse,
   OpenClawStatus,
+  SettingsSaveResponse,
+  Weather,
 } from "@concierge/shared";
 
 const API = "/api";
@@ -64,4 +67,38 @@ export async function reportScreen(
 export async function touchTest(): Promise<{ count: number }> {
   const res = await fetch(`${API}/device/touch-test`, { method: "POST" });
   return res.json();
+}
+
+export async function fetchWeather(force = false): Promise<Weather> {
+  const res = await fetch(
+    `${API}/weather${force ? "?force=1" : ""}`,
+  );
+  if (res.status === 404) {
+    throw new Error("NO_CITY");
+  }
+  if (!res.ok) throw new Error("Weather fetch failed");
+  return res.json();
+}
+
+export async function fetchSettings(): Promise<AppSettings> {
+  const res = await fetch(`${API}/settings`);
+  if (!res.ok) throw new Error("Settings fetch failed");
+  return res.json();
+}
+
+export async function saveSettings(city: string): Promise<SettingsSaveResponse> {
+  const res = await fetch(`${API}/settings`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ city }),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    return {
+      ok: false,
+      settings: {},
+      message: data.message ?? "Save failed",
+    };
+  }
+  return data;
 }

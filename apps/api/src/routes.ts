@@ -1,10 +1,18 @@
 import { Router } from "express";
 import type {
   ActionResponse,
+  AppSettings,
   DeviceStatus,
   HealthResponse,
   LogsResponse,
+  SettingsSaveResponse,
 } from "@concierge/shared";
+import {
+  clearWeatherCache,
+  geocodeCity,
+  getWeather,
+} from "./weather/service.js";
+import { getAppSettings, saveWeatherLocation } from "./settings.js";
 import { MOCK_OPENCLAW, VERSION } from "./config.js";
 import { recordRestart } from "./db.js";
 import {
@@ -130,6 +138,55 @@ router.post("/device/screen", (req, res) => {
 router.post("/device/touch-test", (_req, res) => {
   touchTestCount += 1;
   res.json({ count: touchTestCount, at: new Date().toISOString() });
+});
+
+router.get("/settings", (_req, res) => {
+  const body: AppSettings = getAppSettings();
+  res.json(body);
+});
+
+router.post("/settings", async (req, res) => {
+  try {
+    const city = String(req.body?.city ?? "").trim();
+    if (!city) {
+      res.status(400).json({ ok: false, message: "City is required" });
+      return;
+    }
+    const geo = await geocodeCity(city);
+    saveWeatherLocation(geo.name, geo.latitude, geo.longitude);
+    clearWeatherCache();
+    const settings: AppSettings = getAppSettings();
+    const body: SettingsSaveResponse = {
+      ok: true,
+      settings,
+      message: `Saved ${geo.name}`,
+    };
+    res.json(body);
+  } catch (err) {
+    res.status(400).json({
+      ok: false,
+      message: err instanceof Error ? err.message : "Failed to save settings",
+    });
+  }
+});
+
+router.get("/weather", async (req, res) => {
+  try {
+    const force = req.query.force === "1";
+    const weather = await getWeather(force);
+    if (!weather) {
+      res.status(404).json({
+        error: "No city configured",
+        hint: "Open Settings and set your city",
+      });
+      return;
+    }
+    res.json(weather);
+  } catch (err) {
+    res.status(500).json({
+      error: err instanceof Error ? err.message : "Weather fetch failed",
+    });
+  }
 });
 
 export default router;
