@@ -60,8 +60,8 @@ cd /Volumes/AHARDRIVE/Projects/Concierge
 git init
 git add .
 git commit -m "Initial Concierge MVP"
-# Create an empty repo on GitHub, then:
-git remote add origin https://github.com/YOUR_USER/concierge.git
+# Repo: git@github.com:andperez123/AgentConcierge.git
+git remote add origin git@github.com:andperez123/AgentConcierge.git
 git branch -M main
 git push -u origin main
 ```
@@ -70,7 +70,8 @@ git push -u origin main
 
 ```bash
 sudo apt install -y git
-git clone https://github.com/YOUR_USER/concierge.git ~/Concierge
+git clone git@github.com:andperez123/AgentConcierge.git ~/Concierge
+# Or HTTPS: git clone https://github.com/andperez123/AgentConcierge.git ~/Concierge
 cd ~/Concierge
 chmod +x deploy/install-pi.sh deploy/kiosk/launch-kiosk.sh
 ./deploy/install-pi.sh
