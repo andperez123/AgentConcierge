@@ -7,6 +7,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 INSTALL_DIR="${CONCIERGE_INSTALL_DIR:-/opt/concierge}"
 PI_USER="${SUDO_USER:-$USER}"
 PI_HOME="$(eval echo "~${PI_USER}")"
+PI_UID="$(id -u "${PI_USER}")"
 
 echo "==> Building Concierge in ${ROOT}"
 cd "${ROOT}"
@@ -29,6 +30,8 @@ sudo chown -R "${PI_USER}:${PI_USER}" "${INSTALL_DIR}"
 echo "==> Installing systemd units (user: ${PI_USER})"
 sed -e "s|@CONCIERGE_USER@|${PI_USER}|g" \
   -e "s|@CONCIERGE_HOME@|${PI_HOME}|g" \
+  -e "s|@CONCIERGE_UID@|${PI_UID}|g" \
+  -e "s|@CONCIERGE_NPM_BIN@|${PI_HOME}/.npm-global/bin|g" \
   "${INSTALL_DIR}/deploy/systemd/concierge-api.service" \
   | sudo tee /etc/systemd/system/concierge-api.service >/dev/null
 sed -e "s|@CONCIERGE_USER@|${PI_USER}|g" \

@@ -106,10 +106,10 @@ export default function Home() {
             ? `Reachable · ${status.probe.capability ?? "connected"}`
             : "Not reachable on loopback"}
           <br />
-          {checkedSec !== null
-            ? `Last check: ${checkedSec}s ago`
-            : error
-              ? error
+          {error
+            ? `Error: ${error}`
+            : checkedSec !== null
+              ? `Last check: ${checkedSec}s ago`
               : "Checking…"}
           {status?.lastRestartAt && (
             <>

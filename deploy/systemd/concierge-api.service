@@ -11,6 +11,13 @@ Environment=NODE_ENV=production
 Environment=PORT=3080
 Environment=MOCK_OPENCLAW=0
 Environment=CONCIERGE_DATA_DIR=/opt/concierge/data
+Environment=HOME=@CONCIERGE_HOME@
+Environment=CONCIERGE_HOME=@CONCIERGE_HOME@
+Environment=CONCIERGE_USER=@CONCIERGE_USER@
+Environment=CONCIERGE_UID=@CONCIERGE_UID@
+Environment=XDG_RUNTIME_DIR=/run/user/@CONCIERGE_UID@
+Environment=PATH=@CONCIERGE_NPM_BIN@:/usr/local/bin:/usr/bin:/bin
+Environment=OPENCLAW_BIN=@CONCIERGE_NPM_BIN@/openclaw
 ExecStart=/usr/bin/node /opt/concierge/apps/api/dist/index.js
 Restart=on-failure
 RestartSec=5

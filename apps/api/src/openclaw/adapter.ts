@@ -11,16 +11,19 @@ import {
   STATUS_CACHE_MS,
 } from "../config.js";
 import { getLastRestartAt } from "../db.js";
+import { openclawEnv } from "./env.js";
 
 const execFileAsync = promisify(execFile);
 
 let cachedStatus: OpenClawStatus | null = null;
 let cachedAt = 0;
 let mockOnline = true;
+let statusInFlight: Promise<OpenClawStatus> | null = null;
 
 function readGatewayPort(): number {
   try {
-    const configPath = join(homedir(), ".openclaw", "openclaw.json");
+    const home = openclawEnv().HOME ?? homedir();
+    const configPath = join(home, ".openclaw", "openclaw.json");
     const raw = readFileSync(configPath, "utf8");
     const parsed = JSON.parse(raw) as {
       gateway?: { port?: number };
@@ -39,7 +42,7 @@ async function runOpenClaw(
     const { stdout, stderr } = await execFileAsync(OPENCLAW_BIN, args, {
       timeout: timeoutMs,
       maxBuffer: 4 * 1024 * 1024,
-      env: process.env,
+      env: openclawEnv(),
     });
     return { stdout: stdout.trim(), stderr: stderr.trim(), code: 0 };
   } catch (err: unknown) {
@@ -156,15 +159,9 @@ function mockStatus(): OpenClawStatus {
   };
 }
 
-export async function getOpenClawStatus(
-  force = false,
-): Promise<OpenClawStatus> {
+async function probeStatus(force: boolean): Promise<OpenClawStatus> {
   const now = Date.now();
-  if (
-    !force &&
-    cachedStatus &&
-    now - cachedAt < STATUS_CACHE_MS
-  ) {
+  if (!force && cachedStatus && now - cachedAt < STATUS_CACHE_MS) {
     return { ...cachedStatus, stale: now - cachedAt > STATUS_CACHE_MS * 2 };
   }
 
@@ -177,44 +174,37 @@ export async function getOpenClawStatus(
   const port = readGatewayPort();
   const checkedAt = new Date().toISOString();
 
-  const { stdout, code } = await runOpenClaw([
-    "gateway",
-    "status",
-    "--json",
-    "--deep",
-  ]);
+  // Fast path: HTTP probes (avoids stacking slow CLI calls every 5s)
+  const readyz = await fetchHealthz(port);
+  const reachable = readyz !== "unknown";
+  const serviceRunning = reachable;
 
-  let parsed: Partial<OpenClawStatus> = {};
-  if (stdout) {
-    parsed = parseGatewayStatusJson(stdout);
+  let parsed: Partial<OpenClawStatus> = {
+    readyz,
+    probe: { reachable },
+    service: { running: serviceRunning, unit: "openclaw-gateway.service" },
+  };
+
+  if (reachable && (force || !cachedStatus || now - cachedAt > 15000)) {
+    const { stdout } = await runOpenClaw(
+      ["gateway", "status", "--json", "--no-probe"],
+      8000,
+    );
+    if (stdout) {
+      parsed = { ...parsed, ...parseGatewayStatusJson(stdout) };
+    }
   }
-
-  if (!parsed.probe?.reachable && code !== 0) {
-    const readyz = await fetchHealthz(port);
-    parsed = {
-      ...parsed,
-      readyz: readyz === "ok" ? "ok" : readyz,
-      probe: { reachable: readyz !== "unknown", ...parsed.probe },
-      service: { running: readyz !== "unknown", ...parsed.service },
-    };
-  } else if (parsed.readyz === "unknown") {
-    parsed.readyz = await fetchHealthz(port);
-  }
-
-  const serviceRunning = parsed.service?.running ?? false;
-  const reachable = parsed.probe?.reachable ?? false;
-  const readyz = parsed.readyz ?? "unknown";
 
   const status: OpenClawStatus = {
     state: mapState(
-      serviceRunning,
-      reachable,
-      readyz,
+      parsed.service?.running ?? serviceRunning,
+      parsed.probe?.reachable ?? reachable,
+      parsed.readyz ?? readyz,
       parsed.eventLoopDegraded,
     ),
-    service: parsed.service ?? { running: false },
-    probe: parsed.probe ?? { reachable: false },
-    readyz,
+    service: parsed.service ?? { running: serviceRunning },
+    probe: parsed.probe ?? { reachable },
+    readyz: parsed.readyz ?? readyz,
     eventLoopDegraded: parsed.eventLoopDegraded,
     lastRestartAt: getLastRestartAt(),
     checkedAt,
@@ -223,6 +213,16 @@ export async function getOpenClawStatus(
   cachedStatus = status;
   cachedAt = now;
   return status;
+}
+
+export async function getOpenClawStatus(force = false): Promise<OpenClawStatus> {
+  if (statusInFlight && !force) {
+    return statusInFlight;
+  }
+  statusInFlight = probeStatus(force).finally(() => {
+    statusInFlight = null;
+  });
+  return statusInFlight;
 }
 
 export async function restartGateway(
@@ -240,7 +240,36 @@ export async function restartGateway(
     ? ["gateway", "restart", "--force", "--json"]
     : ["gateway", "restart", "--safe", "--json"];
 
-  const { stdout, stderr, code } = await runOpenClaw(args, 60000);
+  let { stdout, stderr, code } = await runOpenClaw(args, 60000);
+
+  if (code !== 0) {
+    const home = openclawEnv().HOME ?? homedir();
+    const uid = process.env.CONCIERGE_UID;
+    const systemctl = uid
+      ? [
+          "systemctl",
+          "--user",
+          "restart",
+          "openclaw-gateway.service",
+        ]
+      : null;
+    if (systemctl) {
+      try {
+        await execFileAsync(systemctl[0], systemctl.slice(1), {
+          timeout: 30000,
+          env: openclawEnv(),
+        });
+        code = 0;
+        stdout = "Restarted openclaw-gateway.service via systemctl --user";
+      } catch (e: unknown) {
+        const err = e as { stderr?: string; message?: string };
+        stderr =
+          stderr ||
+          (err.stderr ?? err.message ?? "systemctl restart failed").toString();
+      }
+    }
+  }
+
   cachedStatus = null;
   const message = stdout || stderr || (code === 0 ? "Restarted" : "Restart failed");
   return { ok: code === 0, message };
@@ -273,8 +302,11 @@ export async function getLogs(lineCount = 200): Promise<{
     };
   }
 
-  const logDir = join(homedir(), ".openclaw", "logs");
+  const home = openclawEnv().HOME ?? homedir();
+  const logDir = join(home, ".openclaw", "logs");
+  const tmpDir = "/tmp/openclaw";
   const candidates = [
+    join(tmpDir, `openclaw-${new Date().toISOString().slice(0, 10)}.log`),
     join(logDir, "gateway.log"),
     join(logDir, "openclaw.log"),
   ];
