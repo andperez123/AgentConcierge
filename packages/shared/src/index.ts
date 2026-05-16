@@ -46,10 +46,21 @@ export interface ActionResponse {
   at: string;
 }
 
+export type TempUnit = "fahrenheit" | "celsius";
+
+export interface GeocodeResult {
+  name: string;
+  latitude: number;
+  longitude: number;
+  country?: string;
+  admin1?: string;
+}
+
 export interface AppSettings {
   city?: string;
   latitude?: number;
   longitude?: number;
+  tempUnit?: TempUnit;
 }
 
 export interface Weather {
@@ -59,6 +70,7 @@ export interface Weather {
   condition: string;
   icon: WeatherIcon;
   fetchedAt: string;
+  unit: TempUnit;
 }
 
 export type WeatherIcon =
@@ -76,4 +88,33 @@ export interface SettingsSaveResponse {
   ok: boolean;
   settings: AppSettings;
   message?: string;
+}
+
+export interface Reminder {
+  id: number;
+  text: string;
+  dueAt?: string;
+  createdAt: string;
+  source?: string;
+  dismissedAt?: string;
+}
+
+export interface Note {
+  id: number;
+  text: string;
+  createdAt: string;
+  source?: string;
+  pinned?: boolean;
+}
+
+export interface CreateReminderBody {
+  text: string;
+  dueAt?: string;
+  source?: string;
+}
+
+export interface CreateNoteBody {
+  text: string;
+  source?: string;
+  pinned?: boolean;
 }

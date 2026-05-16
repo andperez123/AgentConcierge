@@ -1,9 +1,11 @@
+import type { AppSettings, GeocodeResult, TempUnit } from "@concierge/shared";
 import { db } from "./db.js";
 
 const KEYS = {
   city: "weather_city",
   lat: "weather_lat",
   lon: "weather_lon",
+  tempUnit: "weather_temp_unit",
 } as const;
 
 export function getSetting(key: string): string | undefined {
@@ -20,11 +22,12 @@ export function setSetting(key: string, value: string): void {
   ).run(key, value);
 }
 
-export function getAppSettings(): {
-  city?: string;
-  latitude?: number;
-  longitude?: number;
-} {
+export function getTempUnit(): TempUnit {
+  const u = getSetting(KEYS.tempUnit);
+  return u === "celsius" ? "celsius" : "fahrenheit";
+}
+
+export function getAppSettings(): AppSettings {
   const city = getSetting(KEYS.city);
   const lat = getSetting(KEYS.lat);
   const lon = getSetting(KEYS.lon);
@@ -32,6 +35,7 @@ export function getAppSettings(): {
     city,
     latitude: lat ? Number(lat) : undefined,
     longitude: lon ? Number(lon) : undefined,
+    tempUnit: getTempUnit(),
   };
 }
 
@@ -43,4 +47,8 @@ export function saveWeatherLocation(
   setSetting(KEYS.city, city);
   setSetting(KEYS.lat, String(latitude));
   setSetting(KEYS.lon, String(longitude));
+}
+
+export function saveTempUnit(unit: TempUnit): void {
+  setSetting(KEYS.tempUnit, unit);
 }

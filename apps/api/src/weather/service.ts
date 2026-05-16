@@ -1,11 +1,10 @@
-import type { Weather, WeatherIcon } from "@concierge/shared";
-import { getAppSettings } from "../settings.js";
+import type { GeocodeResult, TempUnit, Weather, WeatherIcon } from "@concierge/shared";
+import { getAppSettings, getTempUnit } from "../settings.js";
 
 const GEOCODE_URL = "https://geocoding-api.open-meteo.com/v1/search";
 const FORECAST_URL = "https://api.open-meteo.com/v1/forecast";
 
-const CACHE_MS =
-  Number(process.env.WEATHER_CACHE_MINUTES ?? 15) * 60 * 1000;
+const CACHE_MS = Number(process.env.WEATHER_CACHE_MINUTES ?? 5) * 60 * 1000;
 
 let cached: Weather | null = null;
 let cachedAt = 0;
@@ -48,12 +47,29 @@ function wmoToLabel(code: number): string {
   return labels[code] ?? "Unknown";
 }
 
-export async function geocodeCity(
-  city: string,
-): Promise<{ name: string; latitude: number; longitude: number }> {
+function formatPlace(hit: {
+  name: string;
+  latitude: number;
+  longitude: number;
+  admin1?: string;
+  country?: string;
+}): GeocodeResult {
+  const name = [hit.name, hit.admin1, hit.country].filter(Boolean).join(", ");
+  return {
+    name,
+    latitude: hit.latitude,
+    longitude: hit.longitude,
+    country: hit.country,
+    admin1: hit.admin1,
+  };
+}
+
+export async function searchGeocode(query: string): Promise<GeocodeResult[]> {
+  const q = query.trim();
+  if (!q) return [];
   const params = new URLSearchParams({
-    name: city.trim(),
-    count: "1",
+    name: q,
+    count: "5",
     language: "en",
     format: "json",
   });
@@ -70,21 +86,26 @@ export async function geocodeCity(
       country?: string;
     }>;
   };
-  const hit = data.results?.[0];
-  if (!hit) throw new Error(`City not found: ${city}`);
-  const label = [hit.name, hit.admin1, hit.country].filter(Boolean).join(", ");
-  return { name: label, latitude: hit.latitude, longitude: hit.longitude };
+  return (data.results ?? []).map(formatPlace);
+}
+
+export async function geocodeCity(city: string): Promise<GeocodeResult> {
+  const results = await searchGeocode(city);
+  if (!results[0]) throw new Error(`City not found: ${city}`);
+  return results[0];
 }
 
 async function fetchForecast(
   lat: number,
   lon: number,
   cityLabel: string,
+  unit: TempUnit,
 ): Promise<Weather> {
   const params = new URLSearchParams({
     latitude: String(lat),
     longitude: String(lon),
     current: "temperature_2m,apparent_temperature,weather_code",
+    temperature_unit: unit === "fahrenheit" ? "fahrenheit" : "celsius",
     timezone: "auto",
   });
   const res = await fetch(`${FORECAST_URL}?${params}`, {
@@ -106,6 +127,7 @@ async function fetchForecast(
     condition: wmoToLabel(code),
     icon: wmoToIcon(code),
     fetchedAt: new Date().toISOString(),
+    unit,
   };
 }
 
@@ -119,8 +141,9 @@ export async function getWeather(force = false): Promise<Weather | null> {
     return null;
   }
 
+  const unit = settings.tempUnit ?? getTempUnit();
   const now = Date.now();
-  if (!force && cached && now - cachedAt < CACHE_MS) {
+  if (!force && cached && cachedAt && now - cachedAt < CACHE_MS) {
     return cached;
   }
 
@@ -128,6 +151,7 @@ export async function getWeather(force = false): Promise<Weather | null> {
     settings.latitude,
     settings.longitude,
     settings.city,
+    unit,
   );
   cached = weather;
   cachedAt = now;

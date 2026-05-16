@@ -20,6 +20,21 @@ db.exec(`
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS reminders (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    text TEXT NOT NULL,
+    due_at TEXT,
+    created_at TEXT NOT NULL,
+    source TEXT,
+    dismissed_at TEXT
+  );
+  CREATE TABLE IF NOT EXISTS notes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    text TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    source TEXT,
+    pinned INTEGER NOT NULL DEFAULT 0
+  );
 `);
 
 export function recordRestart(

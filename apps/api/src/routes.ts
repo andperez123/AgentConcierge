@@ -11,8 +11,13 @@ import {
   clearWeatherCache,
   geocodeCity,
   getWeather,
+  searchGeocode,
 } from "./weather/service.js";
-import { getAppSettings, saveWeatherLocation } from "./settings.js";
+import {
+  getAppSettings,
+  saveTempUnit,
+  saveWeatherLocation,
+} from "./settings.js";
 import { MOCK_OPENCLAW, VERSION } from "./config.js";
 import { recordRestart } from "./db.js";
 import {
@@ -21,6 +26,16 @@ import {
   restartGateway,
   runDoctor,
 } from "./openclaw/adapter.js";
+import {
+  createNote,
+  dismissNote,
+  listNotes,
+} from "./notes.js";
+import {
+  createReminder,
+  dismissReminder,
+  listReminders,
+} from "./reminders.js";
 import {
   arch as osArch,
   hostname,
@@ -99,10 +114,7 @@ router.post("/openclaw/doctor", async (_req, res) => {
 
 router.get("/openclaw/logs", async (req, res) => {
   try {
-    const lines = Math.min(
-      Number(req.query.lines ?? 200),
-      500,
-    );
+    const lines = Math.min(Number(req.query.lines ?? 200), 500);
     const result = await getLogs(lines);
     const body: LogsResponse = result;
     res.json(body);
@@ -141,27 +153,65 @@ router.post("/device/touch-test", (_req, res) => {
 });
 
 router.get("/settings", (_req, res) => {
-  const body: AppSettings = getAppSettings();
-  res.json(body);
+  res.json(getAppSettings());
+});
+
+router.get("/geocode", async (req, res) => {
+  try {
+    const q = String(req.query.q ?? "").trim();
+    if (!q) {
+      res.json([]);
+      return;
+    }
+    const results = await searchGeocode(q);
+    res.json(results);
+  } catch (err) {
+    res.status(500).json({
+      error: err instanceof Error ? err.message : "Geocode failed",
+    });
+  }
 });
 
 router.post("/settings", async (req, res) => {
   try {
-    const city = String(req.body?.city ?? "").trim();
-    if (!city) {
-      res.status(400).json({ ok: false, message: "City is required" });
-      return;
+    const body = req.body ?? {};
+    if (body.tempUnit === "fahrenheit" || body.tempUnit === "celsius") {
+      saveTempUnit(body.tempUnit);
     }
-    const geo = await geocodeCity(city);
-    saveWeatherLocation(geo.name, geo.latitude, geo.longitude);
+
+    const lat = body.latitude;
+    const lon = body.longitude;
+    const cityLabel = String(body.city ?? "").trim();
+
+    if (typeof lat === "number" && typeof lon === "number" && cityLabel) {
+      saveWeatherLocation(cityLabel, lat, lon);
+    } else {
+      const query = String(body.query ?? body.city ?? "").trim();
+      if (!query) {
+        if (body.tempUnit) {
+          clearWeatherCache();
+          const settings: AppSettings = getAppSettings();
+          res.json({
+            ok: true,
+            settings,
+            message: "Units updated",
+          } satisfies SettingsSaveResponse);
+          return;
+        }
+        res.status(400).json({ ok: false, message: "City or location required" });
+        return;
+      }
+      const geo = await geocodeCity(query);
+      saveWeatherLocation(geo.name, geo.latitude, geo.longitude);
+    }
+
     clearWeatherCache();
-    const settings: AppSettings = getAppSettings();
-    const body: SettingsSaveResponse = {
+    const settings = getAppSettings();
+    res.json({
       ok: true,
       settings,
-      message: `Saved ${geo.name}`,
-    };
-    res.json(body);
+      message: `Saved ${settings.city ?? "location"}`,
+    } satisfies SettingsSaveResponse);
   } catch (err) {
     res.status(400).json({
       ok: false,
@@ -187,6 +237,54 @@ router.get("/weather", async (req, res) => {
       error: err instanceof Error ? err.message : "Weather fetch failed",
     });
   }
+});
+
+router.get("/reminders", (_req, res) => {
+  res.json(listReminders());
+});
+
+router.post("/reminders", (req, res) => {
+  try {
+    const reminder = createReminder(req.body ?? {});
+    res.status(201).json(reminder);
+  } catch (err) {
+    res.status(400).json({
+      error: err instanceof Error ? err.message : "Invalid reminder",
+    });
+  }
+});
+
+router.delete("/reminders/:id", (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id) || !dismissReminder(id)) {
+    res.status(404).json({ ok: false, message: "Reminder not found" });
+    return;
+  }
+  res.json({ ok: true });
+});
+
+router.get("/notes", (_req, res) => {
+  res.json(listNotes());
+});
+
+router.post("/notes", (req, res) => {
+  try {
+    const note = createNote(req.body ?? {});
+    res.status(201).json(note);
+  } catch (err) {
+    res.status(400).json({
+      error: err instanceof Error ? err.message : "Invalid note",
+    });
+  }
+});
+
+router.delete("/notes/:id", (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id) || !dismissNote(id)) {
+    res.status(404).json({ ok: false, message: "Note not found" });
+    return;
+  }
+  res.json({ ok: true });
 });
 
 export default router;

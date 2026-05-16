@@ -8,6 +8,20 @@ interface Props {
   loading: boolean;
 }
 
+function minutesAgo(iso: string): string {
+  const min = Math.max(
+    0,
+    Math.floor((Date.now() - new Date(iso).getTime()) / 60000),
+  );
+  if (min < 1) return "Updated just now";
+  if (min === 1) return "Updated 1m ago";
+  return `Updated ${min}m ago`;
+}
+
+function unitSymbol(unit: Weather["unit"]): string {
+  return unit === "fahrenheit" ? "°F" : "°C";
+}
+
 export default function WeatherCard({ weather, needsCity, loading }: Props) {
   if (needsCity || !weather) {
     return (
@@ -24,11 +38,17 @@ export default function WeatherCard({ weather, needsCity, loading }: Props) {
         <WeatherIconDisplay icon={weather.icon} />
       </div>
       <div className="weather-card__body">
-        <span className="weather-card__temp">{weather.temperature}°</span>
+        <span className="weather-card__temp">
+          {weather.temperature}
+          {unitSymbol(weather.unit)}
+        </span>
         <span className="weather-card__condition">
           {loading ? "Updating…" : weather.condition}
         </span>
         <span className="weather-card__city">{weather.city}</span>
+        <span className="weather-card__updated">
+          {minutesAgo(weather.fetchedAt)}
+        </span>
       </div>
     </Link>
   );

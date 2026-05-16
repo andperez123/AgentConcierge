@@ -3,9 +3,13 @@ import { Link, useNavigate } from "react-router-dom";
 import { fetchHealth, restartGateway, touchTest } from "../api";
 import ActionTile from "../components/ActionTile";
 import ClockHero from "../components/ClockHero";
+import NotesStrip from "../components/NotesStrip";
 import OpenClawTile from "../components/OpenClawTile";
+import RemindersCard from "../components/RemindersCard";
 import WeatherCard from "../components/WeatherCard";
+import { useNotes } from "../hooks/useNotes";
 import { useOpenClawStatus } from "../hooks/useOpenClawStatus";
+import { useReminders } from "../hooks/useReminders";
 import { useWeather } from "../hooks/useWeather";
 
 export default function Home() {
@@ -16,6 +20,8 @@ export default function Home() {
     loading: weatherLoading,
     refresh: refreshWeather,
   } = useWeather();
+  const { reminders, dismiss: dismissReminder } = useReminders();
+  const { notes, dismiss: dismissNote } = useNotes();
   const navigate = useNavigate();
   const [apiOk, setApiOk] = useState(false);
   const [mock, setMock] = useState(false);
@@ -53,14 +59,12 @@ export default function Home() {
   return (
     <div className="app-kiosk">
       <header className="home-header">
-        <div className="home-top">
-          <ClockHero onLongPress={() => void handleClockLongPress()} />
-          <WeatherCard
-            weather={weather}
-            needsCity={needsCity}
-            loading={weatherLoading}
-          />
-        </div>
+        <ClockHero onLongPress={() => void handleClockLongPress()} />
+        <WeatherCard
+          weather={weather}
+          needsCity={needsCity}
+          loading={weatherLoading}
+        />
         <div className="home-header__tools">
           <Link to="/settings" className="settings-btn" aria-label="Settings">
             <svg
@@ -82,9 +86,13 @@ export default function Home() {
         </div>
       </header>
 
-      <OpenClawTile status={status} error={error} mock={mock} />
+      <main className="home-main">
+        <OpenClawTile status={status} error={error} mock={mock} />
+        <RemindersCard reminders={reminders} onDismiss={dismissReminder} />
+        <NotesStrip notes={notes} onDismiss={dismissNote} />
+      </main>
 
-      <div className="actions-row">
+      <footer className="actions-row">
         <ActionTile
           label="Restart gateway"
           variant="primary"
@@ -95,7 +103,7 @@ export default function Home() {
           variant="secondary"
           onClick={() => navigate("/logs")}
         />
-      </div>
+      </footer>
 
       {debugMsg && <div className="debug-toast">{debugMsg}</div>}
 

@@ -1,11 +1,17 @@
 import type {
   ActionResponse,
   AppSettings,
+  CreateNoteBody,
+  CreateReminderBody,
   DeviceStatus,
+  GeocodeResult,
   HealthResponse,
   LogsResponse,
+  Note,
   OpenClawStatus,
+  Reminder,
   SettingsSaveResponse,
+  TempUnit,
   Weather,
 } from "@concierge/shared";
 
@@ -70,12 +76,8 @@ export async function touchTest(): Promise<{ count: number }> {
 }
 
 export async function fetchWeather(force = false): Promise<Weather> {
-  const res = await fetch(
-    `${API}/weather${force ? "?force=1" : ""}`,
-  );
-  if (res.status === 404) {
-    throw new Error("NO_CITY");
-  }
+  const res = await fetch(`${API}/weather${force ? "?force=1" : ""}`);
+  if (res.status === 404) throw new Error("NO_CITY");
   if (!res.ok) throw new Error("Weather fetch failed");
   return res.json();
 }
@@ -86,11 +88,23 @@ export async function fetchSettings(): Promise<AppSettings> {
   return res.json();
 }
 
-export async function saveSettings(city: string): Promise<SettingsSaveResponse> {
+export async function searchGeocode(q: string): Promise<GeocodeResult[]> {
+  const res = await fetch(`${API}/geocode?q=${encodeURIComponent(q)}`);
+  if (!res.ok) throw new Error("Geocode search failed");
+  return res.json();
+}
+
+export async function saveSettings(opts: {
+  query?: string;
+  city?: string;
+  latitude?: number;
+  longitude?: number;
+  tempUnit?: TempUnit;
+}): Promise<SettingsSaveResponse> {
   const res = await fetch(`${API}/settings`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ city }),
+    body: JSON.stringify(opts),
   });
   const data = await res.json();
   if (!res.ok) {
@@ -101,4 +115,46 @@ export async function saveSettings(city: string): Promise<SettingsSaveResponse> 
     };
   }
   return data;
+}
+
+export async function fetchReminders(): Promise<Reminder[]> {
+  const res = await fetch(`${API}/reminders`);
+  if (!res.ok) throw new Error("Reminders fetch failed");
+  return res.json();
+}
+
+export async function dismissReminder(id: number): Promise<void> {
+  await fetch(`${API}/reminders/${id}`, { method: "DELETE" });
+}
+
+export async function createReminder(
+  body: CreateReminderBody,
+): Promise<Reminder> {
+  const res = await fetch(`${API}/reminders`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error("Failed to create reminder");
+  return res.json();
+}
+
+export async function fetchNotes(): Promise<Note[]> {
+  const res = await fetch(`${API}/notes`);
+  if (!res.ok) throw new Error("Notes fetch failed");
+  return res.json();
+}
+
+export async function dismissNote(id: number): Promise<void> {
+  await fetch(`${API}/notes/${id}`, { method: "DELETE" });
+}
+
+export async function createNote(body: CreateNoteBody): Promise<Note> {
+  const res = await fetch(`${API}/notes`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error("Failed to create note");
+  return res.json();
 }
