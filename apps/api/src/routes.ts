@@ -19,13 +19,9 @@ import {
   saveWeatherLocation,
 } from "./settings.js";
 import { MOCK_OPENCLAW, VERSION } from "./config.js";
-import { recordRestart } from "./db.js";
-import {
-  getLogs,
-  getOpenClawStatus,
-  restartGateway,
-  runDoctor,
-} from "./openclaw/adapter.js";
+import { getOperation } from "./db.js";
+import { getLogs, getOpenClawStatus } from "./openclaw/adapter.js";
+import { mapToSystemHealth } from "./openclaw/health.js";
 import {
   createNote,
   dismissNote,
@@ -36,6 +32,31 @@ import {
   dismissReminder,
   listReminders,
 } from "./reminders.js";
+import dashboardRouter, {
+  setClientScreen,
+  incrementTouchTest,
+  getTouchTestCount,
+} from "./dashboard/routes.js";
+import { getClientScreenInfo } from "./dashboard/state.js";
+import { listIncidents, parseLogIncidents } from "./incidents.js";
+import {
+  listAlerts,
+  createAlert,
+  ackAlert,
+  deleteAlert,
+} from "./alerts.js";
+import type { CreateAlertBody } from "@concierge/shared";
+import { listRestartEvents } from "./db.js";
+import {
+  startOperation,
+  runRestartOperation,
+  runDoctorOperation,
+  runReauthOperation,
+} from "./operations/runner.js";
+import {
+  collectDeviceMetrics,
+  checkNetworkOnline,
+} from "./device/metrics.js";
 import {
   arch as osArch,
   hostname,
@@ -45,9 +66,7 @@ import {
 
 const router = Router();
 
-let clientScreen: { width: number; height: number } | undefined;
-let touchTestCount = 0;
-let clientKiosk = false;
+router.use("/dashboard", dashboardRouter);
 
 router.get("/health", (_req, res) => {
   const body: HealthResponse = {
@@ -71,51 +90,47 @@ router.get("/openclaw/status", async (req, res) => {
 });
 
 router.post("/openclaw/restart", async (req, res) => {
-  try {
-    const force = req.body?.force === true;
-    const result = await restartGateway(force);
-    recordRestart(
-      force ? "force" : "safe",
-      result.ok ? 0 : 1,
-      result.message,
-    );
-    const body: ActionResponse = {
-      ok: result.ok,
-      message: result.message,
-      at: new Date().toISOString(),
-    };
-    res.status(result.ok ? 200 : 500).json(body);
-  } catch (err) {
-    res.status(500).json({
-      ok: false,
-      message: err instanceof Error ? err.message : "Restart failed",
-      at: new Date().toISOString(),
-    });
-  }
+  const force = req.body?.force === true;
+  const op = startOperation("restart-gateway");
+  void runRestartOperation(op.operationId, force);
+  const body: ActionResponse = {
+    ok: true,
+    message: "Restart queued",
+    at: op.acceptedAt,
+    operationId: op.operationId,
+  };
+  res.status(202).json(body);
 });
 
 router.post("/openclaw/doctor", async (_req, res) => {
-  try {
-    const result = await runDoctor();
-    const body: ActionResponse = {
-      ok: result.ok,
-      message: result.message,
-      at: new Date().toISOString(),
-    };
-    res.status(result.ok ? 200 : 500).json(body);
-  } catch (err) {
-    res.status(500).json({
-      ok: false,
-      message: err instanceof Error ? err.message : "Doctor failed",
-      at: new Date().toISOString(),
-    });
-  }
+  const op = startOperation("run-doctor");
+  void runDoctorOperation(op.operationId);
+  const body: ActionResponse = {
+    ok: true,
+    message: "Doctor queued",
+    at: op.acceptedAt,
+    operationId: op.operationId,
+  };
+  res.status(202).json(body);
+});
+
+router.post("/openclaw/reauth", async (_req, res) => {
+  const op = startOperation("reauth");
+  void runReauthOperation(op.operationId);
+  const body: ActionResponse = {
+    ok: true,
+    message: "Reauth queued",
+    at: op.acceptedAt,
+    operationId: op.operationId,
+  };
+  res.status(202).json(body);
 });
 
 router.get("/openclaw/logs", async (req, res) => {
   try {
     const lines = Math.min(Number(req.query.lines ?? 200), 500);
     const result = await getLogs(lines);
+    parseLogIncidents(result.lines);
     const body: LogsResponse = result;
     res.json(body);
   } catch (err) {
@@ -125,15 +140,100 @@ router.get("/openclaw/logs", async (req, res) => {
   }
 });
 
-router.get("/device/status", (_req, res) => {
+router.get("/openclaw/restarts", (_req, res) => {
+  res.json(listRestartEvents(20));
+});
+
+router.get("/alerts", (_req, res) => {
+  res.json(listAlerts(false));
+});
+
+router.post("/alerts", (req, res) => {
+  try {
+    const body = req.body as CreateAlertBody;
+    if (!body?.title || !body?.message) {
+      res.status(400).json({ error: "title and message required" });
+      return;
+    }
+    res.status(201).json(createAlert(body));
+  } catch (err) {
+    res.status(400).json({
+      error: err instanceof Error ? err.message : "Invalid alert",
+    });
+  }
+});
+
+router.post("/alerts/:id/ack", (req, res) => {
+  if (ackAlert(req.params.id)) res.json({ ok: true });
+  else res.status(404).json({ ok: false });
+});
+
+router.delete("/alerts/:id", (req, res) => {
+  if (deleteAlert(req.params.id)) res.json({ ok: true });
+  else res.status(404).json({ ok: false });
+});
+
+router.get("/events/incidents", (req, res) => {
+  const limit = Math.min(Number(req.query.limit ?? 5), 50);
+  const severity = req.query.severity
+    ? String(req.query.severity)
+    : undefined;
+  res.json(listIncidents({ limit, severity }));
+});
+
+router.get("/logs/diagnostic-bundle", async (_req, res) => {
+  try {
+    const status = await getOpenClawStatus(true);
+    const health = mapToSystemHealth(status);
+    const logs = await getLogs(50);
+    parseLogIncidents(logs.lines);
+    const metrics = collectDeviceMetrics();
+    const networkOnline = await checkNetworkOnline();
+    res.json({
+      health,
+      incidents: listIncidents({ limit: 5 }),
+      restarts: listRestartEvents(5),
+      device: {
+        hostname: hostname(),
+        uptimeSeconds: Math.floor(uptime()),
+        platform: osPlatform(),
+        arch: osArch(),
+        metrics,
+        networkOnline,
+      },
+      logLines: logs.lines,
+      generatedAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    res.status(500).json({
+      error: err instanceof Error ? err.message : "Diagnostic failed",
+    });
+  }
+});
+
+router.get("/operations/:id", (req, res) => {
+  const op = getOperation(req.params.id);
+  if (!op) {
+    res.status(404).json({ error: "Operation not found" });
+    return;
+  }
+  res.json(op);
+});
+
+router.get("/device/status", async (_req, res) => {
+  const metrics = collectDeviceMetrics();
+  const networkOnline = await checkNetworkOnline();
+  const { screen, kiosk } = getClientScreenInfo();
   const body: DeviceStatus = {
     hostname: hostname(),
     uptimeSeconds: Math.floor(uptime()),
     platform: osPlatform(),
     arch: osArch(),
-    screen: clientScreen,
-    kiosk: clientKiosk,
-    touchTestCount,
+    screen,
+    kiosk,
+    touchTestCount: getTouchTestCount(),
+    metrics,
+    networkOnline,
   };
   res.json(body);
 });
@@ -141,15 +241,20 @@ router.get("/device/status", (_req, res) => {
 router.post("/device/screen", (req, res) => {
   const { width, height, kiosk } = req.body ?? {};
   if (typeof width === "number" && typeof height === "number") {
-    clientScreen = { width, height };
+    setClientScreen(width, height, Boolean(kiosk));
+  } else if (typeof kiosk === "boolean") {
+    setClientScreen(
+      typeof width === "number" ? width : 1024,
+      typeof height === "number" ? height : 600,
+      kiosk,
+    );
   }
-  if (typeof kiosk === "boolean") clientKiosk = kiosk;
   res.json({ ok: true });
 });
 
 router.post("/device/touch-test", (_req, res) => {
-  touchTestCount += 1;
-  res.json({ count: touchTestCount, at: new Date().toISOString() });
+  const count = incrementTouchTest();
+  res.json({ count, at: new Date().toISOString() });
 });
 
 router.get("/settings", (_req, res) => {

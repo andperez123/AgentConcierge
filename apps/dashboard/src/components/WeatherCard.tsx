@@ -6,6 +6,7 @@ interface Props {
   weather: Weather | null;
   needsCity: boolean;
   loading: boolean;
+  compact?: boolean;
 }
 
 function minutesAgo(iso: string): string {
@@ -22,12 +23,32 @@ function unitSymbol(unit: Weather["unit"]): string {
   return unit === "fahrenheit" ? "°F" : "°C";
 }
 
-export default function WeatherCard({ weather, needsCity, loading }: Props) {
+export default function WeatherCard({
+  weather,
+  needsCity,
+  loading,
+  compact,
+}: Props) {
   if (needsCity || !weather) {
     return (
-      <Link to="/settings" className="weather-card weather-card--empty">
+      <Link
+        to="/settings"
+        className={`weather-card weather-card--empty${compact ? " weather-card--compact" : ""}`}
+      >
         <span className="weather-card__label">Weather</span>
         <span className="weather-card__cta">Tap to set city</span>
+      </Link>
+    );
+  }
+
+  if (compact) {
+    return (
+      <Link to="/settings" className="weather-card weather-card--compact">
+        <WeatherIconDisplay icon={weather.icon} />
+        <span className="weather-card__temp">
+          {weather.temperature}
+          {unitSymbol(weather.unit)}
+        </span>
       </Link>
     );
   }

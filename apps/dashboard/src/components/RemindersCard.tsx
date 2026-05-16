@@ -11,16 +11,22 @@ function formatDue(dueAt?: string): string | null {
 interface Props {
   reminders: Reminder[];
   onDismiss: (id: number) => void;
+  compact?: boolean;
 }
 
-export default function RemindersCard({ reminders, onDismiss }: Props) {
+export default function RemindersCard({
+  reminders,
+  onDismiss,
+  compact,
+}: Props) {
   if (reminders.length === 0) return null;
+  const shown = compact ? reminders.slice(0, 2) : reminders;
 
   return (
-    <div className="feed-card">
+    <div className={`feed-card${compact ? " feed-card--compact" : ""}`}>
       <div className="feed-card__title">Reminders</div>
       <ul className="feed-list">
-        {reminders.map((r) => {
+        {shown.map((r) => {
           const due = formatDue(r.dueAt);
           const overdue = due === "Overdue";
           return (
@@ -43,7 +49,7 @@ export default function RemindersCard({ reminders, onDismiss }: Props) {
           );
         })}
       </ul>
-      <p className="feed-card__hint">Tap to dismiss</p>
+      {!compact && <p className="feed-card__hint">Tap to dismiss</p>}
     </div>
   );
 }

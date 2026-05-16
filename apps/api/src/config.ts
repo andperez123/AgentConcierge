@@ -15,7 +15,7 @@ export const OPENCLAW_BIN = process.env.OPENCLAW_BIN ?? "openclaw";
 export const OPENCLAW_GATEWAY_PORT = Number(
   process.env.OPENCLAW_GATEWAY_PORT ?? 18789,
 );
-export const VERSION = "0.3.0";
+export const VERSION = "0.4.0";
 export const DATA_DIR =
   process.env.CONCIERGE_DATA_DIR ?? join(__dirname, "..", "data");
 export const DASHBOARD_DIST =

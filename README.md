@@ -18,10 +18,14 @@ On the Pi, `deploy/systemd/concierge-api.service` sets `MOCK_OPENCLAW=0`.
 
 ## Dashboard features
 
-- Large clock + date (optimized for **1024×600** ELECROW touchscreen)
-- Weather via [Open-Meteo](https://open-meteo.com/) — set your city in **Settings** (gear icon)
-- OpenClaw gateway status card + restart / logs / doctor
-- Touch targets **~100px** tall for primary actions
+- **1024×600-native** operator home: system state, attention queue, action strip, utilities
+- Severity-based gateway health (`healthy`, `degraded`, `blocked`, `action_needed`, …)
+- Weather via [Open-Meteo](https://open-meteo.com/) — set your city in **Settings**
+- Structured **alerts** + reminders/notes for OpenClaw
+- `GET /api/dashboard/state` — single snapshot for agents
+- SSE push (`GET /api/dashboard/events`) + `POST /api/dashboard/commands`
+- Device metrics (CPU temp, memory, disk) on Pi
+- Debug screen: **5 taps on clock** → `/debug`
 
 **First run:** open the dashboard → tap the gear → enter your city → Save.
 
@@ -125,12 +129,23 @@ On the Pi:
 
 ```bash
 curl http://127.0.0.1:3080/api/health
-# should show "mock": false
+# should show "mock": false, version 0.4.0+
 
 openclaw gateway status
 curl http://127.0.0.1:3080/api/openclaw/status
+curl http://127.0.0.1:3080/api/dashboard/state
 # should match gateway status; no "mock": true in JSON
 ```
+
+OpenClaw can push desk alerts and read full state:
+
+```bash
+curl -s -X POST http://127.0.0.1:3080/api/alerts \
+  -H 'Content-Type: application/json' \
+  -d '{"title":"Check logs","message":"Gateway noisy","source":"openclaw"}'
+```
+
+See [`skills/concierge-display/SKILL.md`](skills/concierge-display/SKILL.md).
 
 If `/api/health` shows `"mock": true`, the API was started with mock enabled — fix with:
 
@@ -145,9 +160,10 @@ In a browser on the Pi (or another device on your LAN):
 You should see:
 
 - **API OK** (top right)
-- **OpenClaw** card matching `openclaw gateway status` (Online / Degraded / Offline)
-- **Tap to test** increments the touch counter
-- **Restart gateway** works (confirm dialog)
+- **4-zone home**: gateway health, attention queue, action strip, utilities
+- Health label matching gateway (`HEALTHY`, `DEGRADED`, …)
+- **Restart / Doctor / Logs / Refresh** in the action strip
+- **5 taps on clock** opens `/debug`
 
 ### 4. ELECROW touchscreen kiosk (optional)
 

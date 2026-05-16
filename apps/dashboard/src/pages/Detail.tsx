@@ -1,39 +1,26 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { restartGateway, runDoctor } from "../api";
-import ActionTile from "../components/ActionTile";
-import { useOpenClawStatus } from "../hooks/useOpenClawStatus";
+import { postDashboardAction } from "../api";
+import ActionCard from "../components/ActionCard";
+import { useDashboardState } from "../hooks/useDashboardState";
 
 export default function Detail() {
   const navigate = useNavigate();
-  const { status, refresh } = useOpenClawStatus(3000);
-  const [busy, setBusy] = useState<string | null>(null);
+  const { state, refresh } = useDashboardState(true, 3000);
   const [message, setMessage] = useState<string | null>(null);
+  const health = state?.openclaw;
+  const legacy = health?.legacyState;
 
-  async function handleRestart(force = false) {
-    setBusy("restart");
+  async function run(id: string, body?: Record<string, unknown>) {
     setMessage(null);
     try {
-      const res = await restartGateway(force);
-      setMessage(res.message);
+      const op = await postDashboardAction(id, body);
+      setMessage(`Started ${id} (${op.state})`);
       await refresh(true);
-    } finally {
-      setBusy(null);
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : "Action failed");
     }
   }
-
-  async function handleDoctor() {
-    setBusy("doctor");
-    setMessage(null);
-    try {
-      const res = await runDoctor();
-      setMessage(res.message.slice(0, 500));
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  const s = status;
 
   return (
     <div className="page-shell">
@@ -45,43 +32,32 @@ export default function Detail() {
 
       <div className="detail-grid">
         <div className="detail-row">
-          <label>State</label>
-          <div className="value">{s?.state ?? "—"}</div>
+          <label>Health</label>
+          <div className="value">{health?.state ?? "—"}</div>
         </div>
         <div className="detail-row">
-          <label>Service</label>
-          <div className="value">
-            {s?.service.running ? "Running" : "Stopped"}
-            {s?.service.unit ? ` · ${s.service.unit}` : ""}
-          </div>
+          <label>Summary</label>
+          <div className="value">{health?.summary ?? "—"}</div>
         </div>
         <div className="detail-row">
-          <label>Probe</label>
-          <div className="value">
-            {s?.probe.reachable ? "Reachable" : "Unreachable"}
-            {s?.probe.capability ? ` · ${s.probe.capability}` : ""}
-            {s?.probe.readProbe ? ` · read: ${s.probe.readProbe}` : ""}
-          </div>
-        </div>
-        <div className="detail-row">
-          <label>Readyz</label>
-          <div className="value">{s?.readyz ?? "—"}</div>
+          <label>Legacy state</label>
+          <div className="value">{legacy ?? "—"}</div>
         </div>
         <div className="detail-row">
           <label>Last check</label>
           <div className="value">
-            {s?.checkedAt ? new Date(s.checkedAt).toLocaleString() : "—"}
-          </div>
-        </div>
-        <div className="detail-row">
-          <label>Last restart</label>
-          <div className="value">
-            {s?.lastRestartAt
-              ? new Date(s.lastRestartAt).toLocaleString()
+            {health?.lastCheckedAt
+              ? new Date(health.lastCheckedAt).toLocaleString()
               : "—"}
           </div>
         </div>
-        {s?.mock && (
+        {health?.reasons && health.reasons.length > 0 && (
+          <div className="detail-row">
+            <label>Reasons</label>
+            <div className="value">{health.reasons.join(" · ")}</div>
+          </div>
+        )}
+        {state?.api.mock && (
           <div className="detail-row">
             <label>Mode</label>
             <div className="value">Mock (dev)</div>
@@ -90,7 +66,7 @@ export default function Detail() {
       </div>
 
       {message && (
-        <div className="detail-row" style={{ marginBottom: 12 }}>
+        <div className="detail-row">
           <label>Result</label>
           <div className="value" style={{ fontSize: "0.85rem" }}>
             {message}
@@ -98,32 +74,27 @@ export default function Detail() {
         </div>
       )}
 
-      <div className="actions-row" style={{ gridTemplateColumns: "1fr 1fr 1fr" }}>
-        <ActionTile
-          label={busy === "restart" ? "…" : "Safe restart"}
-          variant="primary"
-          disabled={busy !== null}
-          onClick={() => void handleRestart()}
-        />
-        <ActionTile
-          label="Force restart"
-          variant="secondary"
-          disabled={busy !== null}
-          onClick={() => void handleRestart(true)}
-        />
-        <ActionTile
-          label={busy === "doctor" ? "…" : "Doctor"}
-          variant="secondary"
-          disabled={busy !== null}
-          onClick={() => void handleDoctor()}
-        />
+      <div className="action-strip action-strip--page">
+        {(state?.actions ?? [])
+          .filter((a) =>
+            ["restart-gateway", "run-doctor", "reauth", "refresh-probes", "view-logs"].includes(
+              a.id,
+            ),
+          )
+          .map((action) => (
+            <ActionCard
+              key={action.id}
+              action={action}
+              variant={action.id === "restart-gateway" ? "primary" : "secondary"}
+              onClick={() => {
+                if (action.id === "view-logs") navigate("/logs");
+                else if (action.id === "restart-gateway")
+                  void run("restart-gateway");
+                else void run(action.id);
+              }}
+            />
+          ))}
       </div>
-
-      <ActionTile
-        label="View logs"
-        variant="secondary"
-        onClick={() => navigate("/logs")}
-      />
     </div>
   );
 }
