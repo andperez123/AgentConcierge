@@ -211,3 +211,56 @@ export async function runRefreshProbesOperation(
   }
   emitDashboardEvent("operation-updated", { operationId });
 }
+
+export async function runWorkEntityAction(
+  operationId: string,
+  kind: import("@concierge/shared").WorkEntityKind,
+  id: string,
+  body: import("@concierge/shared").WorkEntityActionBody,
+): Promise<void> {
+  updateOperation(operationId, {
+    state: "running",
+    startedAt: new Date().toISOString(),
+  });
+  emitDashboardEvent("operation-updated", {
+    operationId,
+    state: "running",
+  });
+
+  try {
+    const { executeWorkAction } = await import("../work/actions.js");
+    const result = await executeWorkAction(kind, id, body);
+    updateOperation(operationId, {
+      state: result.ok ? "succeeded" : "failed",
+      message: result.reply?.slice(0, 500) ?? result.message,
+      finishedAt: new Date().toISOString(),
+      error: result.ok ? undefined : result.message,
+    });
+    emitDashboardEvent("operation-updated", {
+      operationId,
+      state: result.ok ? "succeeded" : "failed",
+      message: result.message,
+    });
+    emitDashboardEvent("state-changed", {});
+    if (result.ok) {
+      emitDashboardEvent("command", {
+        type: "toast",
+        level: "info",
+        message: result.reply?.slice(0, 120) ?? result.message,
+      });
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Action failed";
+    updateOperation(operationId, {
+      state: "failed",
+      message,
+      finishedAt: new Date().toISOString(),
+      error: message,
+    });
+    emitDashboardEvent("operation-updated", {
+      operationId,
+      state: "failed",
+      message,
+    });
+  }
+}

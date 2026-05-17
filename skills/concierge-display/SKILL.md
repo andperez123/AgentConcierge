@@ -20,6 +20,10 @@ Concierge API base: `http://127.0.0.1:3080/api`
 | Center hero quote / motivational card | `POST /api/display/hero` |
 | Voice / spoken command to the agent | `POST /api/voice/command` |
 | Full desk snapshot | `GET /api/dashboard/state` |
+| List OpenClaw projects (`~/clawd/projects/`) | `GET /api/projects` |
+| Project breakdown | `GET /api/projects/:id` |
+| Agent action on reminder/note/project | `POST /api/work/:kind/:id/actions` |
+| Google auth status (display) | `GET /api/openclaw/google/status` |
 
 Do **not** use reminders for critical failures — use **alerts** instead.
 
@@ -88,7 +92,11 @@ Types: `toast`, `navigate`, `focus-alert`, `confirm`, `highlight-action`.
 ```bash
 curl -s -X POST http://127.0.0.1:3080/api/reminders \
   -H 'Content-Type: application/json' \
-  -d '{"text":"Check gateway logs","dueAt":"2026-05-16T18:00:00Z","source":"openclaw"}'
+  -d '{"text":"Check gateway logs","dueAt":"2026-05-16T18:00:00Z","source":"openclaw","projectId":"revenue-factory"}'
+
+curl -s -X PATCH http://127.0.0.1:3080/api/reminders/12 \
+  -H 'Content-Type: application/json' \
+  -d '{"text":"Updated text","dueAt":null}'
 ```
 
 ## Notes
@@ -97,7 +105,40 @@ curl -s -X POST http://127.0.0.1:3080/api/reminders \
 curl -s -X POST http://127.0.0.1:3080/api/notes \
   -H 'Content-Type: application/json' \
   -d '{"text":"API key rotation due Friday","pinned":true,"source":"openclaw"}'
+
+curl -s -X PATCH http://127.0.0.1:3080/api/notes/3 \
+  -H 'Content-Type: application/json' \
+  -d '{"pinned":true}'
 ```
+
+## Projects
+
+Projects live under `~/clawd/projects/<slug>/` on the Pi.
+
+```bash
+curl -s http://127.0.0.1:3080/api/projects
+curl -s http://127.0.0.1:3080/api/projects/revenue-factory
+
+# Optional cache when folder not on disk yet
+curl -s -X POST http://127.0.0.1:3080/api/projects/sync \
+  -H 'Content-Type: application/json' \
+  -d '{"id":"revenue-factory","name":"Revenue Factory","summary":"…"}'
+```
+
+## Work entity actions (agent + Drive via OpenClaw)
+
+Concierge does **not** call Google APIs directly. Actions queue `openclaw agent` with entity context.
+
+```bash
+curl -s -X POST http://127.0.0.1:3080/api/work/reminder/12/actions \
+  -H 'Content-Type: application/json' \
+  -d '{"action":"export-drive"}'
+
+# Actions: ask-agent, export-drive, summarize, complete
+# Kinds: reminder, note, project
+```
+
+Poll: `GET /api/operations/:id`
 
 ## Actions (async, returns operationId)
 

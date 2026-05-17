@@ -2,7 +2,7 @@ import { Link, useLocation } from "react-router-dom";
 import {
   Home,
   Bot,
-  StickyNote,
+  Briefcase,
   Mic,
   Settings,
 } from "lucide-react";
@@ -27,7 +27,12 @@ export default function BottomNav({ state }: Props) {
     const active =
       path === "/"
         ? pathname === "/"
-        : pathname === path || pathname.startsWith(`${path}/`);
+        : path === "/work"
+          ? pathname === "/work" ||
+            pathname.startsWith("/projects/") ||
+            pathname === "/notes" ||
+            pathname === "/reminders"
+          : pathname === path || pathname.startsWith(`${path}/`);
     return `bottom-nav__item${active ? " bottom-nav__item--active" : ""}`;
   }
 
@@ -45,9 +50,9 @@ export default function BottomNav({ state }: Props) {
       <Link to="/task/voice" className="bottom-nav__fab" aria-label="Voice">
         <Mic strokeWidth={2} size={28} />
       </Link>
-      <Link to="/notes" className={navClass("/notes")}>
-        <StickyNote strokeWidth={2} />
-        <span>Notes</span>
+      <Link to="/work" className={navClass("/work")}>
+        <Briefcase strokeWidth={2} />
+        <span>Work</span>
       </Link>
       <Link to="/settings" className={navClass("/settings")}>
         <Settings strokeWidth={2} />

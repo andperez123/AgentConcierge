@@ -85,7 +85,31 @@ db.exec(`
     created_at TEXT NOT NULL,
     delivered_at TEXT
   );
+  CREATE TABLE IF NOT EXISTS project_cache (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    summary TEXT,
+    breakdown_json TEXT,
+    updated_at TEXT NOT NULL
+  );
 `);
+
+function migrateSchema(): void {
+  const reminderCols = db
+    .prepare(`PRAGMA table_info(reminders)`)
+    .all() as Array<{ name: string }>;
+  if (!reminderCols.some((c) => c.name === "project_id")) {
+    db.exec(`ALTER TABLE reminders ADD COLUMN project_id TEXT`);
+  }
+  const noteCols = db
+    .prepare(`PRAGMA table_info(notes)`)
+    .all() as Array<{ name: string }>;
+  if (!noteCols.some((c) => c.name === "project_id")) {
+    db.exec(`ALTER TABLE notes ADD COLUMN project_id TEXT`);
+  }
+}
+
+migrateSchema();
 
 export function recordRestart(
   trigger: string,

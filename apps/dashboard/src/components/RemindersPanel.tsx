@@ -14,10 +14,10 @@ export default function RemindersPanel({ reminders }: Props) {
     <article className="dash-card">
       <header className="dash-card__header">
         <Calendar size={18} />
-        <span>Today&apos;s Reminders</span>
+        <span>Reminders</span>
       </header>
       {shown.length === 0 ? (
-        <p className="reminder-empty">No reminders for today</p>
+        <p className="reminder-empty">No reminders</p>
       ) : (
         <ul className="reminder-list">
           {shown.map((r, i) => {
@@ -40,8 +40,8 @@ export default function RemindersPanel({ reminders }: Props) {
         </ul>
       )}
       <footer className="dash-card__footer">
-        <Link to="/reminders" className="dash-card__footer-btn">
-          View all reminders
+        <Link to="/work" className="dash-card__footer-btn">
+          Open Work
           <ChevronRight size={16} />
         </Link>
       </footer>

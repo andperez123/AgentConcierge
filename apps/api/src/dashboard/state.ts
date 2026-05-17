@@ -8,6 +8,7 @@ import { getOpenClawStatus } from "../openclaw/adapter.js";
 import { getWeather } from "../weather/service.js";
 import { listReminders } from "../reminders.js";
 import { listNotes } from "../notes.js";
+import { getGoogleAuthStatus } from "../openclaw/google.js";
 import { getHeroDisplay } from "../display/hero.js";
 import {
   arch as osArch,
@@ -119,11 +120,22 @@ export async function buildDashboardState(force = false): Promise<DashboardState
   };
   saveSnapshot("device", JSON.stringify(device));
 
+  let google;
+  try {
+    google = await getGoogleAuthStatus(force);
+  } catch {
+    google = {
+      state: "unknown" as const,
+      lastCheckedAt: new Date().toISOString(),
+    };
+  }
+
   return {
     screen: { mode: "home", device: clientKiosk ? "kiosk" : "browser" },
     openclaw,
     alerts: listAlerts(true),
     actions: buildDashboardActions(openclaw.state),
+    integrations: { google },
     widgets: {
       weather: {
         stale: weatherWidget.stale,

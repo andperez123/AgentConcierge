@@ -150,6 +150,15 @@ export interface WidgetFreshness {
   lastGoodAt?: string;
 }
 
+export interface GoogleAuthStatus {
+  state: "connected" | "expired" | "missing" | "unknown";
+  account?: string;
+  scopes?: string[];
+  lastCheckedAt: string;
+  message?: string;
+  recommendedAction?: "reauth" | "run-doctor";
+}
+
 export interface DashboardState {
   screen: { mode: string; device: string };
   openclaw: SystemHealth;
@@ -160,6 +169,9 @@ export interface DashboardState {
     hero?: HeroDisplay | null;
     reminders: Reminder[];
     notes: Note[];
+  };
+  integrations?: {
+    google?: GoogleAuthStatus;
   };
   device?: DeviceStatus;
   api: { ok: boolean; version: string; mock: boolean };
@@ -290,6 +302,7 @@ export interface Reminder {
   createdAt: string;
   source?: string;
   dismissedAt?: string;
+  projectId?: string;
 }
 
 export interface Note {
@@ -298,16 +311,71 @@ export interface Note {
   createdAt: string;
   source?: string;
   pinned?: boolean;
+  projectId?: string;
 }
 
 export interface CreateReminderBody {
   text: string;
   dueAt?: string;
   source?: string;
+  projectId?: string;
 }
 
 export interface CreateNoteBody {
   text: string;
   source?: string;
   pinned?: boolean;
+  projectId?: string;
+}
+
+export interface UpdateReminderBody {
+  text?: string;
+  dueAt?: string | null;
+  projectId?: string | null;
+}
+
+export interface UpdateNoteBody {
+  text?: string;
+  pinned?: boolean;
+  projectId?: string | null;
+}
+
+export interface OpenClawProject {
+  id: string;
+  name: string;
+  summary?: string;
+  updatedAt?: string;
+  path?: string;
+}
+
+export interface ProjectBreakdownSection {
+  title: string;
+  items: Array<{ label: string; detail?: string }>;
+}
+
+export interface ProjectBreakdown {
+  project: OpenClawProject;
+  sections: ProjectBreakdownSection[];
+  linkedReminders: Reminder[];
+  linkedNotes: Note[];
+}
+
+export interface SyncProjectBody {
+  id: string;
+  name?: string;
+  summary?: string;
+  breakdown?: ProjectBreakdownSection[];
+}
+
+export type WorkEntityKind = "reminder" | "note" | "project";
+
+export type WorkEntityActionId =
+  | "ask-agent"
+  | "export-drive"
+  | "summarize"
+  | "complete";
+
+export interface WorkEntityActionBody {
+  action: WorkEntityActionId;
+  options?: { folder?: string; prompt?: string };
 }

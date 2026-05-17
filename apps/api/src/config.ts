@@ -1,10 +1,17 @@
 import { config } from "dotenv";
+import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-
 config();
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
+const home =
+  process.env.CONCIERGE_HOME ?? process.env.HOME ?? homedir();
+export const OPENCLAW_CLAWD_DIR =
+  process.env.OPENCLAW_CLAWD_DIR ?? join(home, "clawd");
+export const OPENCLAW_PROJECTS_DIR =
+  process.env.OPENCLAW_PROJECTS_DIR ?? join(OPENCLAW_CLAWD_DIR, "projects");
 
 export const PORT = Number(process.env.PORT ?? 3080);
 /** Only for local dev without the openclaw CLI. Never used in production. */

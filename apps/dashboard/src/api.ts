@@ -10,19 +10,26 @@ import type {
   DeviceStatus,
   DiagnosticBundle,
   GeocodeResult,
+  GoogleAuthStatus,
   HealthResponse,
   Incident,
   LogsResponse,
   Note,
+  OpenClawProject,
   OpenClawStatus,
   Operation,
   OperationResponse,
+  ProjectBreakdown,
   Reminder,
   RestartEvent,
   SettingsSaveResponse,
   TempUnit,
+  UpdateNoteBody,
+  UpdateReminderBody,
   VoiceCommandResponse,
   Weather,
+  WorkEntityActionBody,
+  WorkEntityKind,
 } from "@concierge/shared";
 
 const API = "/api";
@@ -229,7 +236,7 @@ export async function createReminder(
   const res = await fetch(`${API}/reminders`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ ...body, source: body.source ?? "dashboard" }),
   });
   if (!res.ok) throw new Error("Failed to create reminder");
   return res.json();
@@ -264,8 +271,69 @@ export async function createNote(body: CreateNoteBody): Promise<Note> {
   const res = await fetch(`${API}/notes`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ ...body, source: body.source ?? "dashboard" }),
   });
   if (!res.ok) throw new Error("Failed to create note");
+  return res.json();
+}
+
+export async function updateReminder(
+  id: number,
+  body: UpdateReminderBody,
+): Promise<Reminder> {
+  const res = await fetch(`${API}/reminders/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error("Failed to update reminder");
+  return res.json();
+}
+
+export async function updateNote(id: number, body: UpdateNoteBody): Promise<Note> {
+  const res = await fetch(`${API}/notes/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error("Failed to update note");
+  return res.json();
+}
+
+export async function fetchGoogleAuthStatus(
+  force = false,
+): Promise<GoogleAuthStatus> {
+  const res = await fetch(
+    `${API}/openclaw/google/status${force ? "?force=1" : ""}`,
+  );
+  if (!res.ok) throw new Error("Google status fetch failed");
+  return res.json();
+}
+
+export async function fetchProjects(): Promise<OpenClawProject[]> {
+  const res = await fetch(`${API}/projects`);
+  if (!res.ok) throw new Error("Projects fetch failed");
+  return res.json();
+}
+
+export async function fetchProjectBreakdown(
+  id: string,
+): Promise<ProjectBreakdown> {
+  const res = await fetch(`${API}/projects/${encodeURIComponent(id)}`);
+  if (!res.ok) throw new Error("Project not found");
+  return res.json();
+}
+
+export async function postWorkEntityAction(
+  kind: WorkEntityKind,
+  id: string,
+  body: WorkEntityActionBody,
+): Promise<OperationResponse> {
+  const res = await fetch(`${API}/work/${kind}/${encodeURIComponent(id)}/actions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error("Action failed");
   return res.json();
 }

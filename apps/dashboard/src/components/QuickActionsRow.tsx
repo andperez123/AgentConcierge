@@ -19,7 +19,7 @@ const QUICK_ACTIONS = [
   { id: "restart-gateway", label: "Restart Gateway", icon: RotateCcw },
   { id: "voice", label: "Voice Command", icon: Mic, route: "/task/voice" },
   { id: "view-logs", label: "View Logs", icon: FileText, route: "/logs" },
-  { id: "notes", label: "Notes", icon: Pencil, route: "/notes" },
+  { id: "work", label: "Work", icon: Pencil, route: "/work" },
   { id: "reauth", label: "Reauthenticate", icon: Lock, route: "/task/reauth" },
 ] as const;
 
@@ -52,7 +52,7 @@ export default function QuickActionsRow({
             action?.state === "running" || action?.state === "queued";
           const disabled =
             item.id !== "voice" &&
-            item.id !== "notes" &&
+            item.id !== "work" &&
             action &&
             (!action.enabled || busy);
           return (

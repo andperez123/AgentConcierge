@@ -1,4 +1,4 @@
-import { Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
 import { useEffect } from "react";
 import { reportScreen } from "./api";
 import { useDensity } from "./hooks/useDensity";
@@ -12,8 +12,8 @@ import Incident from "./pages/Incident";
 import TaskReauth from "./pages/TaskReauth";
 import TaskRecovery from "./pages/TaskRecovery";
 import TaskVoice from "./pages/TaskVoice";
-import Notes from "./pages/Notes";
-import Reminders from "./pages/Reminders";
+import Work from "./pages/Work";
+import ProjectDetail from "./pages/ProjectDetail";
 
 export default function App() {
   useDensity();
@@ -33,8 +33,10 @@ export default function App() {
         <Route path="/logs" element={<Logs />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/debug" element={<Debug />} />
-        <Route path="/notes" element={<Notes />} />
-        <Route path="/reminders" element={<Reminders />} />
+        <Route path="/work" element={<Work />} />
+        <Route path="/projects/:id" element={<ProjectDetail />} />
+        <Route path="/notes" element={<Navigate to="/work?tab=notes" replace />} />
+        <Route path="/reminders" element={<Navigate to="/work?tab=reminders" replace />} />
         <Route path="/incident/:alertId" element={<Incident />} />
         <Route path="/task/reauth" element={<TaskReauth />} />
         <Route path="/task/recovery" element={<TaskRecovery />} />

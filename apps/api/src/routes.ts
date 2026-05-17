@@ -25,13 +25,26 @@ import { mapToSystemHealth } from "./openclaw/health.js";
 import {
   createNote,
   dismissNote,
+  getNote,
   listNotes,
+  updateNote,
 } from "./notes.js";
 import {
   createReminder,
   dismissReminder,
+  getReminder,
   listReminders,
+  updateReminder,
 } from "./reminders.js";
+import {
+  getProject,
+  getProjectBreakdown,
+  listProjects,
+  syncProject,
+} from "./openclaw/projects.js";
+import { getGoogleAuthStatus } from "./openclaw/google.js";
+import { queueWorkEntityAction } from "./work/actions.js";
+import type { SyncProjectBody, WorkEntityActionBody, WorkEntityKind } from "@concierge/shared";
 import dashboardRouter, {
   setClientScreen,
   incrementTouchTest,
@@ -346,14 +359,87 @@ router.get("/weather", async (req, res) => {
   }
 });
 
-router.get("/reminders", (_req, res) => {
-  res.json(listReminders());
+router.get("/openclaw/google/status", async (req, res) => {
+  try {
+    const force = req.query.force === "1";
+    res.json(await getGoogleAuthStatus(force));
+  } catch (err) {
+    res.status(500).json({
+      error: err instanceof Error ? err.message : "Google status failed",
+    });
+  }
+});
+
+router.get("/projects", (_req, res) => {
+  res.json(listProjects());
+});
+
+router.get("/projects/:id", (req, res) => {
+  const breakdown = getProjectBreakdown(req.params.id);
+  if (!breakdown) {
+    res.status(404).json({ error: "Project not found" });
+    return;
+  }
+  res.json(breakdown);
+});
+
+router.post("/projects/sync", (req, res) => {
+  try {
+    const project = syncProject(req.body as SyncProjectBody);
+    emitDashboardEvent("state-changed", {});
+    res.status(201).json(project);
+  } catch (err) {
+    res.status(400).json({
+      error: err instanceof Error ? err.message : "Invalid project sync",
+    });
+  }
+});
+
+router.get("/reminders", (req, res) => {
+  const projectId = req.query.projectId
+    ? String(req.query.projectId)
+    : undefined;
+  res.json(listReminders(projectId));
+});
+
+router.get("/reminders/:id", (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) {
+    res.status(400).json({ error: "Invalid id" });
+    return;
+  }
+  const reminder = getReminder(id);
+  if (!reminder) {
+    res.status(404).json({ error: "Reminder not found" });
+    return;
+  }
+  res.json(reminder);
 });
 
 router.post("/reminders", (req, res) => {
   try {
     const reminder = createReminder(req.body ?? {});
     res.status(201).json(reminder);
+  } catch (err) {
+    res.status(400).json({
+      error: err instanceof Error ? err.message : "Invalid reminder",
+    });
+  }
+});
+
+router.patch("/reminders/:id", (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) {
+    res.status(400).json({ error: "Invalid id" });
+    return;
+  }
+  try {
+    const reminder = updateReminder(id, req.body ?? {});
+    if (!reminder) {
+      res.status(404).json({ error: "Reminder not found" });
+      return;
+    }
+    res.json(reminder);
   } catch (err) {
     res.status(400).json({
       error: err instanceof Error ? err.message : "Invalid reminder",
@@ -370,14 +456,51 @@ router.delete("/reminders/:id", (req, res) => {
   res.json({ ok: true });
 });
 
-router.get("/notes", (_req, res) => {
-  res.json(listNotes());
+router.get("/notes", (req, res) => {
+  const projectId = req.query.projectId
+    ? String(req.query.projectId)
+    : undefined;
+  res.json(listNotes(projectId));
+});
+
+router.get("/notes/:id", (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) {
+    res.status(400).json({ error: "Invalid id" });
+    return;
+  }
+  const note = getNote(id);
+  if (!note) {
+    res.status(404).json({ error: "Note not found" });
+    return;
+  }
+  res.json(note);
 });
 
 router.post("/notes", (req, res) => {
   try {
     const note = createNote(req.body ?? {});
     res.status(201).json(note);
+  } catch (err) {
+    res.status(400).json({
+      error: err instanceof Error ? err.message : "Invalid note",
+    });
+  }
+});
+
+router.patch("/notes/:id", (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) {
+    res.status(400).json({ error: "Invalid id" });
+    return;
+  }
+  try {
+    const note = updateNote(id, req.body ?? {});
+    if (!note) {
+      res.status(404).json({ error: "Note not found" });
+      return;
+    }
+    res.json(note);
   } catch (err) {
     res.status(400).json({
       error: err instanceof Error ? err.message : "Invalid note",
@@ -392,6 +515,38 @@ router.delete("/notes/:id", (req, res) => {
     return;
   }
   res.json({ ok: true });
+});
+
+router.post("/work/:kind/:id/actions", (req, res) => {
+  const kind = req.params.kind as WorkEntityKind;
+  if (!["reminder", "note", "project"].includes(kind)) {
+    res.status(400).json({ error: "Invalid entity kind" });
+    return;
+  }
+  if (kind === "project" && !getProject(req.params.id)) {
+    res.status(404).json({ error: "Project not found" });
+    return;
+  }
+  if (kind === "reminder" && !getReminder(Number(req.params.id))) {
+    res.status(404).json({ error: "Reminder not found" });
+    return;
+  }
+  if (kind === "note" && !getNote(Number(req.params.id))) {
+    res.status(404).json({ error: "Note not found" });
+    return;
+  }
+  const body = req.body as WorkEntityActionBody;
+  if (!body?.action) {
+    res.status(400).json({ error: "action is required" });
+    return;
+  }
+  const op = queueWorkEntityAction(kind, req.params.id, body);
+  res.status(202).json({
+    ok: true,
+    operationId: op.operationId,
+    acceptedAt: op.acceptedAt,
+    state: op.state,
+  });
 });
 
 router.get("/display/hero", (_req, res) => {

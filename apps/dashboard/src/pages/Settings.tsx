@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { GeocodeResult, TempUnit } from "@concierge/shared";
-import { fetchSettings, saveSettings, searchGeocode } from "../api";
+import { fetchGoogleAuthStatus, fetchSettings, saveSettings, searchGeocode } from "../api";
 import ActionTile from "../components/ActionTile";
+import GoogleAuthCard from "../components/GoogleAuthCard";
+import type { GoogleAuthStatus } from "@concierge/shared";
 
 export default function Settings() {
   const navigate = useNavigate();
@@ -14,8 +16,12 @@ export default function Settings() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [googleStatus, setGoogleStatus] = useState<GoogleAuthStatus | null>(
+    null,
+  );
 
   useEffect(() => {
+    void fetchGoogleAuthStatus().then(setGoogleStatus).catch(() => setGoogleStatus(null));
     void fetchSettings().then((s) => {
       if (s.city) setQuery(s.city);
       if (s.tempUnit) setTempUnit(s.tempUnit);
@@ -101,6 +107,11 @@ export default function Settings() {
 
       <h1 className="page-title">Settings</h1>
       <p className="page-subtitle">Weather location and units</p>
+
+      <GoogleAuthCard
+        status={googleStatus ?? undefined}
+        onRefresh={() => void fetchGoogleAuthStatus(true).then(setGoogleStatus)}
+      />
 
       <label className="field-label" htmlFor="city">
         City or ZIP

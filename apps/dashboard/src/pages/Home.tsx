@@ -3,8 +3,10 @@ import { useNavigate } from "react-router-dom";
 import { postDashboardAction } from "../api";
 import TopStatusRow from "../components/TopStatusRow";
 import RemindersPanel from "../components/RemindersPanel";
+import NotesPanel from "../components/NotesPanel";
 import HeroCard from "../components/HeroCard";
 import GatewayDetailsCard from "../components/GatewayDetailsCard";
+import GoogleAuthCard from "../components/GoogleAuthCard";
 import QuickActionsRow from "../components/QuickActionsRow";
 import { useDashboardCommands } from "../hooks/useDashboardCommands";
 import { useDashboardState } from "../hooks/useDashboardState";
@@ -67,9 +69,19 @@ export default function Home() {
       />
 
       <section className="home-middle-row">
-        <RemindersPanel reminders={state?.widgets.reminders ?? []} />
+        <div className="home-middle-col">
+          <RemindersPanel reminders={state?.widgets.reminders ?? []} />
+          <NotesPanel notes={state?.widgets.notes ?? []} />
+        </div>
         <HeroCard hero={state?.widgets.hero} />
-        <GatewayDetailsCard state={state} />
+        <div className="home-middle-col">
+          <GoogleAuthCard
+            status={state?.integrations?.google}
+            onRefresh={() => void refresh(true)}
+            loading={pendingAction === "refresh-probes"}
+          />
+          <GatewayDetailsCard state={state} />
+        </div>
       </section>
 
       <QuickActionsRow

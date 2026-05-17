@@ -1838,3 +1838,240 @@ button {
   line-height: 1.45;
 }
 
+/* Home layout columns */
+.home-middle-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+  min-height: 0;
+}
+
+.home-middle-col .dash-card {
+  flex: 1;
+  min-height: 0;
+}
+
+/* Work hub */
+.page-shell--work {
+  gap: 12px;
+}
+
+.work-tabs {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.work-tabs__btn {
+  flex: 1;
+  min-height: 44px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: var(--text-caption);
+  font-weight: 600;
+}
+
+.work-tabs__btn--active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+}
+
+.work-create-bar {
+  display: flex;
+  gap: 8px;
+}
+
+.work-create-bar__btn {
+  flex: 1;
+  min-height: 48px;
+  border-radius: var(--radius-md);
+  border: 1px dashed var(--border);
+  background: var(--surface2);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.work-inline-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.work-inline-form textarea,
+.work-inline-form input {
+  width: 100%;
+  padding: 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--text);
+  font-size: var(--text-body);
+}
+
+.work-inline-form__actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.work-project-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: auto;
+  flex: 1;
+}
+
+/* Work item sheet */
+.work-sheet {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  max-width: 520px;
+  width: 92vw;
+  max-height: 85vh;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.work-sheet__title {
+  margin: 0;
+  font-size: var(--text-title);
+}
+
+.work-sheet__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: var(--text-caption);
+  color: var(--muted);
+}
+
+.work-sheet__field textarea,
+.work-sheet__field input,
+.work-sheet__field select {
+  padding: 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--text);
+  font-size: var(--text-body);
+}
+
+.work-sheet__check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: var(--text-body);
+}
+
+.work-sheet__error {
+  margin: 0;
+  color: var(--offline);
+  font-size: var(--text-caption);
+}
+
+.work-sheet__actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.work-sheet__action-btn {
+  min-height: 48px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--text);
+  font-size: var(--text-caption);
+  font-weight: 600;
+}
+
+/* Google auth card */
+.google-auth-card .dash-card__header {
+  justify-content: space-between;
+}
+
+.google-auth-card__refresh {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: var(--muted);
+  padding: 4px;
+}
+
+.google-auth-card__refresh .spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Project detail */
+.page-shell--project {
+  gap: 12px;
+  overflow: auto;
+}
+
+.project-detail__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.project-detail__path {
+  font-size: var(--text-caption);
+  color: var(--muted);
+  word-break: break-all;
+  margin: 0;
+}
+
+.project-detail__agent {
+  width: 100%;
+}
+
+.project-detail__section {
+  margin-top: 8px;
+}
+
+.project-detail__section-title {
+  margin: 0 0 8px;
+  font-size: var(--text-body);
+  color: var(--accent);
+}
+
+.project-detail__items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.project-detail__item-detail {
+  margin: 4px 0 0;
+  font-size: var(--text-caption);
+  color: var(--muted);
+  line-height: 1.4;
+}
+
