@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { MapPin } from "lucide-react";
 import type { Weather } from "@concierge/shared";
 import WeatherIconDisplay from "./WeatherIcon";
 
@@ -7,16 +8,7 @@ interface Props {
   needsCity: boolean;
   loading: boolean;
   compact?: boolean;
-}
-
-function minutesAgo(iso: string): string {
-  const min = Math.max(
-    0,
-    Math.floor((Date.now() - new Date(iso).getTime()) / 60000),
-  );
-  if (min < 1) return "Updated just now";
-  if (min === 1) return "Updated 1m ago";
-  return `Updated ${min}m ago`;
+  variant?: "default" | "top";
 }
 
 function unitSymbol(unit: Weather["unit"]): string {
@@ -28,6 +20,7 @@ export default function WeatherCard({
   needsCity,
   loading,
   compact,
+  variant = "default",
 }: Props) {
   if (needsCity || !weather) {
     return (
@@ -53,6 +46,35 @@ export default function WeatherCard({
     );
   }
 
+  const sym = unitSymbol(weather.unit);
+
+  if (variant === "top") {
+    return (
+      <Link to="/settings" className="weather-card weather-card--top">
+        <WeatherIconDisplay icon={weather.icon} />
+        <div className="weather-card__main">
+          <span className="weather-card__temp">
+            {weather.temperature}
+            {sym}
+          </span>
+          <span className="weather-card__condition">
+            {loading ? "Updating…" : weather.condition}
+          </span>
+          <span className="weather-card__location">
+            <MapPin size={12} />
+            {weather.city}
+          </span>
+        </div>
+        {(weather.high != null || weather.low != null) && (
+          <div className="weather-card__hilo">
+            {weather.high != null && <span>H {weather.high}°</span>}
+            {weather.low != null && <span>L {weather.low}°</span>}
+          </div>
+        )}
+      </Link>
+    );
+  }
+
   return (
     <Link to="/settings" className="weather-card">
       <div className="weather-card__icon">
@@ -61,15 +83,12 @@ export default function WeatherCard({
       <div className="weather-card__body">
         <span className="weather-card__temp">
           {weather.temperature}
-          {unitSymbol(weather.unit)}
+          {sym}
         </span>
         <span className="weather-card__condition">
           {loading ? "Updating…" : weather.condition}
         </span>
         <span className="weather-card__city">{weather.city}</span>
-        <span className="weather-card__updated">
-          {minutesAgo(weather.fetchedAt)}
-        </span>
       </div>
     </Link>
   );

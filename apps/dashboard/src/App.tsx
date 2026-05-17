@@ -2,6 +2,7 @@ import { Route, Routes } from "react-router-dom";
 import { useEffect } from "react";
 import { reportScreen } from "./api";
 import { useDensity } from "./hooks/useDensity";
+import AppShell from "./components/AppShell";
 import Home from "./pages/Home";
 import Detail from "./pages/Detail";
 import Logs from "./pages/Logs";
@@ -11,6 +12,8 @@ import Incident from "./pages/Incident";
 import TaskReauth from "./pages/TaskReauth";
 import TaskRecovery from "./pages/TaskRecovery";
 import TaskVoice from "./pages/TaskVoice";
+import Notes from "./pages/Notes";
+import Reminders from "./pages/Reminders";
 
 export default function App() {
   useDensity();
@@ -24,15 +27,19 @@ export default function App() {
 
   return (
     <Routes>
-      <Route path="/" element={<Home />} />
-      <Route path="/openclaw" element={<Detail />} />
-      <Route path="/logs" element={<Logs />} />
-      <Route path="/settings" element={<Settings />} />
-      <Route path="/debug" element={<Debug />} />
-      <Route path="/incident/:alertId" element={<Incident />} />
-      <Route path="/task/reauth" element={<TaskReauth />} />
-      <Route path="/task/recovery" element={<TaskRecovery />} />
-      <Route path="/task/voice" element={<TaskVoice />} />
+      <Route element={<AppShell />}>
+        <Route path="/" element={<Home />} />
+        <Route path="/openclaw" element={<Detail />} />
+        <Route path="/logs" element={<Logs />} />
+        <Route path="/settings" element={<Settings />} />
+        <Route path="/debug" element={<Debug />} />
+        <Route path="/notes" element={<Notes />} />
+        <Route path="/reminders" element={<Reminders />} />
+        <Route path="/incident/:alertId" element={<Incident />} />
+        <Route path="/task/reauth" element={<TaskReauth />} />
+        <Route path="/task/recovery" element={<TaskRecovery />} />
+        <Route path="/task/voice" element={<TaskVoice />} />
+      </Route>
     </Routes>
   );
 }

@@ -15,8 +15,9 @@ export function useClock() {
   const seconds = now.toLocaleTimeString([], { second: "2-digit" }).slice(-2);
   const date = now.toLocaleDateString([], {
     weekday: "long",
-    month: "short",
+    month: "long",
     day: "numeric",
+    year: "numeric",
   });
 
   return { time, seconds, date, now };

@@ -45,7 +45,9 @@ import {
   ackAlert,
   deleteAlert,
 } from "./alerts.js";
-import type { CreateAlertBody } from "@concierge/shared";
+import type { CreateAlertBody, SetHeroBody } from "@concierge/shared";
+import { getHeroDisplay, setHeroDisplay } from "./display/hero.js";
+import { emitDashboardEvent } from "./dashboard/events.js";
 import { listRestartEvents } from "./db.js";
 import {
   startOperation,
@@ -390,6 +392,27 @@ router.delete("/notes/:id", (req, res) => {
     return;
   }
   res.json({ ok: true });
+});
+
+router.get("/display/hero", (_req, res) => {
+  res.json(getHeroDisplay());
+});
+
+router.post("/display/hero", (req, res) => {
+  try {
+    const body = req.body as SetHeroBody;
+    if (!body?.quote) {
+      res.status(400).json({ error: "quote is required" });
+      return;
+    }
+    const hero = setHeroDisplay(body);
+    emitDashboardEvent("state-changed", {});
+    res.status(201).json(hero);
+  } catch (err) {
+    res.status(400).json({
+      error: err instanceof Error ? err.message : "Invalid hero display",
+    });
+  }
 });
 
 export default router;

@@ -157,6 +157,7 @@ export interface DashboardState {
   actions: DashboardAction[];
   widgets: {
     weather: WidgetFreshness & { data?: Weather | null };
+    hero?: HeroDisplay | null;
     reminders: Reminder[];
     notes: Note[];
   };
@@ -230,11 +231,28 @@ export interface AppSettings {
 export interface Weather {
   city: string;
   temperature: number;
+  high?: number;
+  low?: number;
   apparentTemperature?: number;
   condition: string;
   icon: WeatherIcon;
   fetchedAt: string;
   unit: TempUnit;
+}
+
+export interface HeroDisplay {
+  quote: string;
+  subtitle?: string;
+  imageUrl?: string;
+  updatedAt: string;
+  source?: string;
+}
+
+export interface SetHeroBody {
+  quote: string;
+  subtitle?: string;
+  imageUrl?: string;
+  source?: string;
 }
 
 export type WeatherIcon =

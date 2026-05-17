@@ -8,6 +8,7 @@ import { getOpenClawStatus } from "../openclaw/adapter.js";
 import { getWeather } from "../weather/service.js";
 import { listReminders } from "../reminders.js";
 import { listNotes } from "../notes.js";
+import { getHeroDisplay } from "../display/hero.js";
 import {
   arch as osArch,
   hostname,
@@ -129,6 +130,7 @@ export async function buildDashboardState(force = false): Promise<DashboardState
         lastGoodAt: weatherWidget.lastGoodAt,
         data: weatherWidget.data,
       },
+      hero: getHeroDisplay(),
       reminders: listReminders().slice(0, 5),
       notes: listNotes().slice(0, 3),
     },

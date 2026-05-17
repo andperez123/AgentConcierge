@@ -105,6 +105,7 @@ async function fetchForecast(
     latitude: String(lat),
     longitude: String(lon),
     current: "temperature_2m,apparent_temperature,weather_code",
+    daily: "temperature_2m_max,temperature_2m_min",
     temperature_unit: unit === "fahrenheit" ? "fahrenheit" : "celsius",
     timezone: "auto",
   });
@@ -118,11 +119,19 @@ async function fetchForecast(
       apparent_temperature: number;
       weather_code: number;
     };
+    daily?: {
+      temperature_2m_max: number[];
+      temperature_2m_min: number[];
+    };
   };
   const code = data.current.weather_code;
+  const high = data.daily?.temperature_2m_max?.[0];
+  const low = data.daily?.temperature_2m_min?.[0];
   return {
     city: cityLabel,
     temperature: Math.round(data.current.temperature_2m),
+    high: high != null ? Math.round(high) : undefined,
+    low: low != null ? Math.round(low) : undefined,
     apparentTemperature: Math.round(data.current.apparent_temperature),
     condition: wmoToLabel(code),
     icon: wmoToIcon(code),

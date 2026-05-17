@@ -1,17 +1,17 @@
-import { useCallback, useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { dismissNote, dismissReminder, postDashboardAction } from "../api";
-import ActionStrip from "../components/ActionStrip";
-import AttentionCard from "../components/AttentionCard";
-import ClockHero from "../components/ClockHero";
-import SystemStateCard from "../components/SystemStateCard";
-import UtilityRow from "../components/UtilityRow";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { postDashboardAction } from "../api";
+import TopStatusRow from "../components/TopStatusRow";
+import RemindersPanel from "../components/RemindersPanel";
+import HeroCard from "../components/HeroCard";
+import GatewayDetailsCard from "../components/GatewayDetailsCard";
+import QuickActionsRow from "../components/QuickActionsRow";
 import { useDashboardCommands } from "../hooks/useDashboardCommands";
 import { useDashboardState } from "../hooks/useDashboardState";
 
 export default function Home() {
   const navigate = useNavigate();
-  const { state, error, refresh } = useDashboardState();
+  const { state, refresh } = useDashboardState();
   const [toast, setToast] = useState<string | null>(null);
   const [debugTaps, setDebugTaps] = useState(0);
   const [showRestart, setShowRestart] = useState(false);
@@ -29,22 +29,6 @@ export default function Home() {
       return () => clearTimeout(t);
     }
   }, [debugTaps, navigate]);
-
-  const dismissReminderCb = useCallback(
-    async (id: number) => {
-      await dismissReminder(id);
-      await refresh(true);
-    },
-    [refresh],
-  );
-
-  const dismissNoteCb = useCallback(
-    async (id: number) => {
-      await dismissNote(id);
-      await refresh(true);
-    },
-    [refresh],
-  );
 
   async function runAction(id: string, force = false) {
     setPendingAction(id);
@@ -74,53 +58,25 @@ export default function Home() {
 
   return (
     <div className="app-kiosk">
-      <header className="home-header home-header--slim">
-        <ClockHero onTap={() => setDebugTaps((n) => n + 1)} />
-        <div className="home-header__tools">
-          <Link to="/settings" className="settings-btn" aria-label="Settings">
-            <svg
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
-              <circle cx="12" cy="12" r="3" />
-              <path d="M12 2v2M12 20v2M4 12H2M22 12h-2M5 5l1.4 1.4M17.6 17.6 19 19M5 19l1.4-1.4M17.6 6.4 19 5" />
-            </svg>
-          </Link>
-          <div className={`api-pill ${state?.api.ok ? "api-pill--ok" : ""}`}>
-            <span className="api-pill__dot" />
-            {state?.api.ok ? "API OK" : "API down"}
-          </div>
-        </div>
-      </header>
+      <TopStatusRow
+        state={state}
+        needsCity={needsCity}
+        weatherLoading={pendingAction === "refresh-probes"}
+        onClockTap={() => setDebugTaps((n) => n + 1)}
+        onRefreshGateway={() => void runAction("refresh-probes")}
+      />
 
-      <main className="home-zones">
-        <SystemStateCard
-          health={state?.openclaw ?? null}
-          mock={state?.api.mock}
-          error={error}
-        />
-        <AttentionCard
-          alerts={state?.alerts ?? []}
-          actions={state?.actions ?? []}
-        />
-        <ActionStrip
-          actions={state?.actions ?? []}
-          onAction={handleAction}
-        />
-        {state && (
-          <UtilityRow
-            state={state}
-            needsCity={needsCity}
-            weatherLoading={pendingAction === "refresh-probes"}
-            onDismissReminder={(id) => void dismissReminderCb(id)}
-            onDismissNote={(id) => void dismissNoteCb(id)}
-          />
-        )}
-      </main>
+      <section className="home-middle-row">
+        <RemindersPanel reminders={state?.widgets.reminders ?? []} />
+        <HeroCard hero={state?.widgets.hero} />
+        <GatewayDetailsCard state={state} />
+      </section>
+
+      <QuickActionsRow
+        actions={state?.actions ?? []}
+        onAction={handleAction}
+        pendingAction={pendingAction}
+      />
 
       {toast && <div className="debug-toast">{toast}</div>}
 

@@ -17,6 +17,7 @@ Concierge API base: `http://127.0.0.1:3080/api`
 | Short desk notes | `POST /api/notes` |
 | Gateway down, auth expired, ops failures | `POST /api/alerts` |
 | Toast, navigate screen, focus incident | `POST /api/dashboard/commands` |
+| Center hero quote / motivational card | `POST /api/display/hero` |
 | Full desk snapshot | `GET /api/dashboard/state` |
 
 Do **not** use reminders for critical failures — use **alerts** instead.
@@ -27,7 +28,17 @@ Do **not** use reminders for critical failures — use **alerts** instead.
 curl -s http://127.0.0.1:3080/api/dashboard/state
 ```
 
-Returns `openclaw` health (`healthy`, `degraded`, `blocked`, `action_needed`, …), `alerts`, `actions`, `widgets` (weather, reminders, notes).
+Returns `openclaw` health (`healthy`, `degraded`, `blocked`, `action_needed`, …), `alerts`, `actions`, `widgets` (weather, hero, reminders, notes).
+
+## Hero card (center panel)
+
+```bash
+curl -s -X POST http://127.0.0.1:3080/api/display/hero \
+  -H 'Content-Type: application/json' \
+  -d '{"quote":"Ship the auth fix today.","subtitle":"Gateway is waiting","source":"openclaw"}'
+```
+
+Optional `imageUrl` for a custom background. Updates appear on the kiosk via SSE (`state-changed`).
 
 ## Alerts
 
