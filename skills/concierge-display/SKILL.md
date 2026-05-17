@@ -18,6 +18,7 @@ Concierge API base: `http://127.0.0.1:3080/api`
 | Gateway down, auth expired, ops failures | `POST /api/alerts` |
 | Toast, navigate screen, focus incident | `POST /api/dashboard/commands` |
 | Center hero quote / motivational card | `POST /api/display/hero` |
+| Voice / spoken command to the agent | `POST /api/voice/command` |
 | Full desk snapshot | `GET /api/dashboard/state` |
 
 Do **not** use reminders for critical failures — use **alerts** instead.
@@ -39,6 +40,20 @@ curl -s -X POST http://127.0.0.1:3080/api/display/hero \
 ```
 
 Optional `imageUrl` for a custom background. Updates appear on the kiosk via SSE (`state-changed`).
+
+## Voice command (kiosk mic)
+
+The dashboard **Voice** screen uses browser speech-to-text, then:
+
+```bash
+curl -s -X POST http://127.0.0.1:3080/api/voice/command \
+  -H 'Content-Type: application/json' \
+  -d '{"text":"What is the gateway status?"}'
+```
+
+On the Pi this runs `openclaw agent --message "…" --json`. Optional env: `OPENCLAW_VOICE_AGENT=<agent-id>` to target a specific agent.
+
+Requires Chromium microphone permission on the kiosk. Replies can be read aloud in the UI (speech synthesis).
 
 ## Alerts
 

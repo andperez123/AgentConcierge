@@ -19,7 +19,7 @@ export default function HeroCard({ hero }: Props) {
     <article className="dash-card hero-card">
       <div className="hero-card__bg" style={bgStyle} aria-hidden />
       <div className="hero-card__content">
-        <Quote className="hero-card__quote-icon" size={28} strokeWidth={2} />
+        <Quote className="hero-card__quote-icon" size={34} strokeWidth={2} />
         <p className="hero-card__quote">{quote}</p>
         {subtitle && <p className="hero-card__subtitle">{subtitle}</p>}
       </div>

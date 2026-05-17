@@ -255,6 +255,17 @@ export interface SetHeroBody {
   source?: string;
 }
 
+export interface VoiceCommandBody {
+  text: string;
+}
+
+export interface VoiceCommandResponse {
+  ok: boolean;
+  reply: string;
+  mock?: boolean;
+  at: string;
+}
+
 export type WeatherIcon =
   | "clear"
   | "partly_cloudy"

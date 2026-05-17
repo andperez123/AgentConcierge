@@ -32,7 +32,7 @@ export default function GatewayStatusChip({ health, mock, onRefresh }: Props) {
         aria-label="Refresh gateway status"
         onClick={onRefresh}
       >
-        <Wifi size={20} strokeWidth={2.5} />
+        <Wifi size={24} strokeWidth={2.5} />
       </button>
     </div>
   );

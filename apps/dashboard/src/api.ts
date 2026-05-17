@@ -21,6 +21,7 @@ import type {
   RestartEvent,
   SettingsSaveResponse,
   TempUnit,
+  VoiceCommandResponse,
   Weather,
 } from "@concierge/shared";
 
@@ -242,6 +243,21 @@ export async function fetchNotes(): Promise<Note[]> {
 
 export async function dismissNote(id: number): Promise<void> {
   await fetch(`${API}/notes/${id}`, { method: "DELETE" });
+}
+
+export async function postVoiceCommand(
+  text: string,
+): Promise<VoiceCommandResponse> {
+  const res = await fetch(`${API}/voice/command`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text }),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error ?? "Voice command failed");
+  }
+  return data as VoiceCommandResponse;
 }
 
 export async function createNote(body: CreateNoteBody): Promise<Note> {

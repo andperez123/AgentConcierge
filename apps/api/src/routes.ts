@@ -20,7 +20,7 @@ import {
 } from "./settings.js";
 import { MOCK_OPENCLAW, VERSION } from "./config.js";
 import { getOperation } from "./db.js";
-import { getLogs, getOpenClawStatus } from "./openclaw/adapter.js";
+import { getLogs, getOpenClawStatus, sendAgentMessage } from "./openclaw/adapter.js";
 import { mapToSystemHealth } from "./openclaw/health.js";
 import {
   createNote,
@@ -396,6 +396,27 @@ router.delete("/notes/:id", (req, res) => {
 
 router.get("/display/hero", (_req, res) => {
   res.json(getHeroDisplay());
+});
+
+router.post("/voice/command", async (req, res) => {
+  try {
+    const text = String(req.body?.text ?? "").trim();
+    if (!text) {
+      res.status(400).json({ error: "text is required" });
+      return;
+    }
+    const result = await sendAgentMessage(text);
+    res.json({
+      ok: result.ok,
+      reply: result.reply,
+      mock: result.mock,
+      at: new Date().toISOString(),
+    });
+  } catch (err) {
+    res.status(500).json({
+      error: err instanceof Error ? err.message : "Voice command failed",
+    });
+  }
 });
 
 router.post("/display/hero", (req, res) => {

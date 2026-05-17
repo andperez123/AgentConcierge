@@ -343,3 +343,60 @@ export async function getLogs(lineCount = 200): Promise<{
     lines: ["No log file found. Check ~/.openclaw/logs/ on the Pi."],
   };
 }
+
+export interface AgentTurnResult {
+  ok: boolean;
+  reply: string;
+  mock?: boolean;
+}
+
+function extractAgentReply(stdout: string): string {
+  const trimmed = stdout.trim();
+  if (!trimmed) return "";
+  try {
+    const data = JSON.parse(trimmed) as Record<string, unknown>;
+    for (const key of ["response", "reply", "message", "text"]) {
+      const v = data[key];
+      if (typeof v === "string" && v.trim()) return v.trim();
+    }
+    const result = data.result as Record<string, unknown> | undefined;
+    if (result) {
+      for (const key of ["response", "message", "text"]) {
+        const v = result[key];
+        if (typeof v === "string" && v.trim()) return v.trim();
+      }
+    }
+    return trimmed;
+  } catch {
+    return trimmed;
+  }
+}
+
+/** Run one agent turn via `openclaw agent --message` (Gateway on Pi). */
+export async function sendAgentMessage(message: string): Promise<AgentTurnResult> {
+  const text = message.trim();
+  if (!text) throw new Error("Message is required");
+
+  if (MOCK_OPENCLAW) {
+    return {
+      ok: true,
+      mock: true,
+      reply: `Got it: “${text}”. (Mock mode — on the Pi this runs openclaw agent.)`,
+    };
+  }
+
+  const agentId = process.env.OPENCLAW_VOICE_AGENT?.trim();
+  const args = ["agent", "--message", text, "--json"];
+  if (agentId) args.splice(1, 0, "--agent", agentId);
+
+  const result = await runOpenClaw(args, 120_000);
+  if (result.code !== 0) {
+    throw new Error(result.stderr || result.stdout || "Agent command failed");
+  }
+
+  const reply = extractAgentReply(result.stdout);
+  return {
+    ok: true,
+    reply: reply || "Agent completed with no text reply.",
+  };
+}

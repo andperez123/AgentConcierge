@@ -43,7 +43,7 @@ export default function BottomNav({ state }: Props) {
         {badge && <span className="bottom-nav__badge" aria-hidden />}
       </Link>
       <Link to="/task/voice" className="bottom-nav__fab" aria-label="Voice">
-        <Mic strokeWidth={2} size={24} />
+        <Mic strokeWidth={2} size={28} />
       </Link>
       <Link to="/notes" className={navClass("/notes")}>
         <StickyNote strokeWidth={2} />
