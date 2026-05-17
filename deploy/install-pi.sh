@@ -19,6 +19,7 @@ sudo mkdir -p "${INSTALL_DIR}"
 sudo rsync -a --delete \
   --exclude node_modules \
   --exclude .git \
+  --exclude data \
   "${ROOT}/" "${INSTALL_DIR}/"
 
 cd "${INSTALL_DIR}"

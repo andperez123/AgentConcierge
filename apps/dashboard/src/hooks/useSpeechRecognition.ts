@@ -2,9 +2,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ensureMicrophoneAccess,
   mapSpeechRecognitionError,
+  micReleaseDelay,
+  resetMicPreflight,
 } from "../lib/micAccess";
 
 type SpeechRecognitionCtor = new () => SpeechRecognition;
+
+const RELEASE_MS = 700;
 
 function getRecognitionCtor(): SpeechRecognitionCtor | null {
   const w = window as Window & {
@@ -33,117 +37,155 @@ export function useSpeechRecognition(options?: UseSpeechRecognitionOptions) {
   const sessionFinalRef = useRef("");
   const interimRef = useRef("");
   const startingRef = useRef(false);
+  const releaseWaitRef = useRef<Promise<void> | null>(null);
 
   useEffect(() => {
     setSupported(getRecognitionCtor() !== null);
   }, []);
 
-  const stop = useCallback(() => {
-    recognitionRef.current?.stop();
+  const releaseRecognition = useCallback(() => {
+    const rec = recognitionRef.current;
+    if (rec) {
+      try {
+        rec.abort();
+      } catch {
+        try {
+          rec.stop();
+        } catch {
+          /* ignore */
+        }
+      }
+    }
     recognitionRef.current = null;
     setListening(false);
     startingRef.current = false;
+    releaseWaitRef.current = micReleaseDelay(RELEASE_MS);
   }, []);
 
-  const start = useCallback(async () => {
-    if (startingRef.current || listening) return;
+  const stop = useCallback(() => {
+    releaseRecognition();
+  }, [releaseRecognition]);
 
-    const Ctor = getRecognitionCtor();
-    if (!Ctor) {
-      setError("Speech recognition is not supported in this browser.");
+  const start = useCallback(
+    async (opts?: { forceMicPreflight?: boolean }) => {
+      if (startingRef.current || listening) return;
+
+      if (releaseWaitRef.current) {
+        await releaseWaitRef.current;
+        releaseWaitRef.current = null;
+      }
+
+      const Ctor = getRecognitionCtor();
+      if (!Ctor) {
+        setError("Speech recognition is not supported in this browser.");
+        setMicRecoverable(false);
+        return;
+      }
+
+      startingRef.current = true;
+      setError(null);
       setMicRecoverable(false);
-      return;
-    }
-
-    startingRef.current = true;
-    setError(null);
-    setMicRecoverable(false);
-    setInterim("");
-    interimRef.current = "";
-    sessionFinalRef.current = "";
-
-    const mic = await ensureMicrophoneAccess();
-    if (!mic.ok) {
-      setError(mic.error);
-      setMicRecoverable(mic.recoverable);
-      startingRef.current = false;
-      return;
-    }
-
-    recognitionRef.current?.abort();
-
-    const rec = new Ctor();
-    recognitionRef.current = rec;
-    rec.lang = "en-US";
-    rec.continuous = false;
-    rec.interimResults = true;
-    rec.maxAlternatives = 1;
-
-    rec.onstart = () => {
-      setListening(true);
-      startingRef.current = false;
-    };
-
-    rec.onend = () => {
-      setListening(false);
-      startingRef.current = false;
-      recognitionRef.current = null;
-
-      const finalText = sessionFinalRef.current.trim();
-      const withInterim = interimRef.current.trim();
-      const combined = finalText || withInterim;
-      sessionFinalRef.current = "";
       setInterim("");
+      interimRef.current = "";
+      sessionFinalRef.current = "";
 
-      if (combined) {
-        onFinalRef.current?.(combined);
+      releaseRecognition();
+      if (releaseWaitRef.current) {
+        await releaseWaitRef.current;
+        releaseWaitRef.current = null;
       }
-    };
 
-    rec.onerror = (ev) => {
-      setListening(false);
-      startingRef.current = false;
-      recognitionRef.current = null;
-
-      const msg = mapSpeechRecognitionError(ev.error);
-      if (msg) {
-        setError(msg);
-        setMicRecoverable(
-          ev.error === "audio-capture" ||
-            ev.error === "not-allowed" ||
-            ev.error === "network",
-        );
+      const mic = await ensureMicrophoneAccess(opts?.forceMicPreflight ?? false);
+      if (!mic.ok) {
+        setError(mic.error);
+        setMicRecoverable(mic.recoverable);
+        startingRef.current = false;
+        return;
       }
-    };
 
-    rec.onresult = (ev) => {
-      let finalChunk = "";
-      let interimChunk = "";
-      for (let i = ev.resultIndex; i < ev.results.length; i++) {
-        const part = ev.results[i]![0]?.transcript ?? "";
-        if (ev.results[i]!.isFinal) finalChunk += part;
-        else interimChunk += part;
-      }
-      if (finalChunk) {
-        sessionFinalRef.current = `${sessionFinalRef.current}${finalChunk}`.trim();
-        setTranscript(sessionFinalRef.current);
+      const rec = new Ctor();
+      recognitionRef.current = rec;
+      rec.lang = "en-US";
+      rec.continuous = false;
+      rec.interimResults = true;
+      rec.maxAlternatives = 1;
+
+      rec.onstart = () => {
+        setListening(true);
+        startingRef.current = false;
+      };
+
+      rec.onend = () => {
+        setListening(false);
+        startingRef.current = false;
+        recognitionRef.current = null;
+        releaseWaitRef.current = micReleaseDelay(RELEASE_MS);
+
+        const finalText = sessionFinalRef.current.trim();
+        const withInterim = interimRef.current.trim();
+        const combined = finalText || withInterim;
+        sessionFinalRef.current = "";
         setInterim("");
-      } else if (interimChunk) {
-        interimRef.current = interimChunk;
-        setInterim(interimChunk);
-      }
-    };
 
-    try {
-      rec.start();
-    } catch (e) {
-      setListening(false);
-      startingRef.current = false;
-      recognitionRef.current = null;
-      setError(e instanceof Error ? e.message : "Could not start listening");
-      setMicRecoverable(true);
-    }
-  }, [listening]);
+        if (combined) {
+          onFinalRef.current?.(combined);
+        }
+      };
+
+      rec.onerror = (ev) => {
+        setListening(false);
+        startingRef.current = false;
+        recognitionRef.current = null;
+        releaseWaitRef.current = micReleaseDelay(RELEASE_MS);
+
+        const msg = mapSpeechRecognitionError(ev.error);
+        if (msg) {
+          setError(msg);
+          setMicRecoverable(
+            ev.error === "audio-capture" ||
+              ev.error === "not-allowed" ||
+              ev.error === "network",
+          );
+        }
+      };
+
+      rec.onresult = (ev) => {
+        let finalChunk = "";
+        let interimChunk = "";
+        for (let i = ev.resultIndex; i < ev.results.length; i++) {
+          const part = ev.results[i]![0]?.transcript ?? "";
+          if (ev.results[i]!.isFinal) finalChunk += part;
+          else interimChunk += part;
+        }
+        if (finalChunk) {
+          sessionFinalRef.current =
+            `${sessionFinalRef.current}${finalChunk}`.trim();
+          setTranscript(sessionFinalRef.current);
+          setInterim("");
+        } else if (interimChunk) {
+          interimRef.current = interimChunk;
+          setInterim(interimChunk);
+        }
+      };
+
+      try {
+        rec.start();
+      } catch (e) {
+        setListening(false);
+        startingRef.current = false;
+        recognitionRef.current = null;
+        releaseWaitRef.current = micReleaseDelay(RELEASE_MS);
+        setError(e instanceof Error ? e.message : "Could not start listening");
+        setMicRecoverable(true);
+      }
+    },
+    [listening, releaseRecognition],
+  );
+
+  const retryMic = useCallback(() => {
+    resetMicPreflight();
+    void start({ forceMicPreflight: true });
+  }, [start]);
 
   const reset = useCallback(() => {
     stop();
@@ -169,6 +211,7 @@ export function useSpeechRecognition(options?: UseSpeechRecognitionOptions) {
     micRecoverable,
     start,
     stop,
+    retryMic,
     reset,
   };
 }

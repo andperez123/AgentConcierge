@@ -226,7 +226,7 @@ export default function TaskVoice() {
       ) {
         startListening();
       }
-    }, 400);
+    }, 1200);
   };
 
   useEffect(() => {
@@ -324,7 +324,7 @@ export default function TaskVoice() {
             <button
               type="button"
               className="voice-page__retry"
-              onClick={() => void speech.start()}
+              onClick={() => speech.retryMic()}
             >
               <RotateCcw size={18} />
               Retry mic

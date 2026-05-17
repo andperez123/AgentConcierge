@@ -2,8 +2,29 @@ export type MicAccessResult =
   | { ok: true }
   | { ok: false; error: string; recoverable: boolean };
 
-/** Request mic permission before Web Speech API (fixes many audio-capture errors). */
-export async function ensureMicrophoneAccess(): Promise<MicAccessResult> {
+/** Avoid opening getUserMedia on every listen (exclusive mics e.g. Seeed HAT on Pi). */
+let micPreflightGranted = false;
+
+export function resetMicPreflight(): void {
+  micPreflightGranted = false;
+}
+
+async function queryMicPermission(): Promise<PermissionState | null> {
+  if (!navigator.permissions?.query) return null;
+  try {
+    const status = await navigator.permissions.query({
+      name: "microphone" as PermissionName,
+    });
+    return status.state;
+  } catch {
+    return null;
+  }
+}
+
+/** Request mic permission once; later calls use Permissions API only (no second capture). */
+export async function ensureMicrophoneAccess(
+  force = false,
+): Promise<MicAccessResult> {
   if (typeof window === "undefined") {
     return { ok: false, error: "Not in a browser.", recoverable: false };
   }
@@ -12,9 +33,19 @@ export async function ensureMicrophoneAccess(): Promise<MicAccessResult> {
     return {
       ok: false,
       error:
-        "Microphone needs a secure page. Use https:// or http://localhost (not LAN IP over HTTP).",
+        "Microphone needs a secure page. Use https:// or http://127.0.0.1 (not LAN IP over HTTP).",
       recoverable: false,
     };
+  }
+
+  if (!force && micPreflightGranted) {
+    return { ok: true };
+  }
+
+  const perm = await queryMicPermission();
+  if (!force && perm === "granted") {
+    micPreflightGranted = true;
+    return { ok: true };
   }
 
   if (!navigator.mediaDevices?.getUserMedia) {
@@ -28,6 +59,7 @@ export async function ensureMicrophoneAccess(): Promise<MicAccessResult> {
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     for (const track of stream.getTracks()) track.stop();
+    micPreflightGranted = true;
     return { ok: true };
   } catch (e) {
     const name = e instanceof DOMException ? e.name : "";
@@ -50,7 +82,7 @@ export async function ensureMicrophoneAccess(): Promise<MicAccessResult> {
       return {
         ok: false,
         error:
-          "Microphone is in use by another app. Close it, then tap Retry.",
+          "Microphone is busy. Turn off Voice mode briefly, wait a second, then tap Retry.",
         recoverable: true,
       };
     }
@@ -68,7 +100,7 @@ export function mapSpeechRecognitionError(code: string): string {
     case "not-allowed":
       return "Microphone permission denied. Allow the mic in site settings, then tap Retry.";
     case "audio-capture":
-      return "Could not capture audio. Check the mic is connected and not in use, then tap Retry.";
+      return "Microphone is busy. Wait a moment or tap Retry — Voice mode re-listens quickly on Pi.";
     case "no-speech":
       return "No speech heard. Try again closer to the mic.";
     case "network":
@@ -80,4 +112,9 @@ export function mapSpeechRecognitionError(code: string): string {
     default:
       return `Speech error: ${code}`;
   }
+}
+
+/** Pause so ALSA/Web Speech can release exclusive capture devices (e.g. Seeed WM8960). */
+export function micReleaseDelay(ms = 600): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
