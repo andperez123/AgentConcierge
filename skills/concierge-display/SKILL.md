@@ -57,7 +57,47 @@ curl -s -X POST http://127.0.0.1:3080/api/voice/command \
 
 On the Pi this runs `openclaw agent --message "…" --json`. Optional env: `OPENCLAW_VOICE_AGENT=<agent-id>` to target a specific agent.
 
-Requires Chromium microphone permission on the kiosk. Replies can be read aloud in the UI (speech synthesis).
+Requires Chromium microphone permission on the kiosk (allow once in Chromium site settings for the Concierge URL; use `http://localhost` or HTTPS, not LAN IP over HTTP). Replies can be read aloud in the UI (speech synthesis). Voice mode loops: listen → send → TTS → listen again.
+
+The API enriches each voice turn with current reminders, notes, and projects. You must perform desk mutations via HTTP and end every reply with the result block below.
+
+### Voice result block (mandatory)
+
+End every voice reply with this exact format (valid JSON between markers):
+
+```
+VOICE_RESULT_JSON:
+{
+  "spokenReply": "Added the reminder.",
+  "actionsTaken": ["created_reminder"],
+  "navigateTo": "/work",
+  "pendingAction": null
+}
+END_VOICE_RESULT_JSON
+```
+
+- `spokenReply`: short text for TTS (required).
+- `actionsTaken`: e.g. `created_reminder`, `dismissed_note`, `listed_projects`.
+- `navigateTo`: null or one of `/`, `/work`, `/work?tab=projects`, `/projects/<slug>` (slug: `a-z0-9-`).
+- `pendingAction`: set when awaiting confirm for fuzzy dismiss, e.g. `{ "kind": "dismiss_reminder", "id": 4 }`.
+
+### Voice command playbook
+
+| User says | Agent should |
+| --------- | -------------- |
+| "Remind me to …" | `POST /api/reminders` + toast; optional `navigateTo: "/work"` |
+| "Note: …" | `POST /api/notes` + toast |
+| "Dismiss reminder 4" (exact id) | `DELETE /api/reminders/4` immediately |
+| "Dismiss the logs reminder" (fuzzy) | Do **not** delete; set `pendingAction`, ask user to say confirm |
+| "Delete note 3" | `DELETE /api/notes/3` |
+| "List projects" | `GET /api/projects`, summarize in `spokenReply` |
+| "Add reminder for revenue-factory: …" | `POST /api/reminders` with `projectId: "revenue-factory"` |
+
+After mutations, `POST /api/dashboard/commands` toast (and navigate if helpful). Never only reply in chat.
+
+### Local control phrases (UI-handled)
+
+The kiosk handles these without calling you: "stop listening", "cancel", "go back", "open work", "show projects". When user says "confirm" after a pending dismiss, they are confirming the action in `pendingAction`.
 
 ## Alerts
 

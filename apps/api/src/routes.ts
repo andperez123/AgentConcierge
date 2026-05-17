@@ -61,6 +61,10 @@ import {
 import type { CreateAlertBody, SetHeroBody } from "@concierge/shared";
 import { getHeroDisplay, setHeroDisplay } from "./display/hero.js";
 import { emitDashboardEvent } from "./dashboard/events.js";
+import {
+  buildMockVoiceReply,
+  buildVoiceAgentMessage,
+} from "./voice/context.js";
 import { listRestartEvents } from "./db.js";
 import {
   startOperation,
@@ -560,7 +564,17 @@ router.post("/voice/command", async (req, res) => {
       res.status(400).json({ error: "text is required" });
       return;
     }
-    const result = await sendAgentMessage(text);
+    if (MOCK_OPENCLAW) {
+      res.json({
+        ok: true,
+        reply: buildMockVoiceReply(text),
+        mock: true,
+        at: new Date().toISOString(),
+      });
+      return;
+    }
+    const message = buildVoiceAgentMessage(text);
+    const result = await sendAgentMessage(message);
     res.json({
       ok: result.ok,
       reply: result.reply,

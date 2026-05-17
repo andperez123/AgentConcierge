@@ -29,6 +29,14 @@ On the Pi, `deploy/systemd/concierge-api.service` sets `MOCK_OPENCLAW=0`.
 
 **First run:** open the dashboard → tap the gear → enter your city → Save.
 
+### Voice command (kiosk mic)
+
+- Bottom nav **mic** → `/task/voice` — browser speech-to-text, then `POST /api/voice/command` → `openclaw agent`.
+- Enable **Voice mode** for hands-free: speak → auto-send → TTS reply → listen again.
+- Mic needs a **secure context** (`localhost` or HTTPS). On Mac dev, use http://localhost:5173 (not LAN IP over HTTP).
+- Optional: `OPENCLAW_VOICE_AGENT=<id>` in `.env` for a dedicated agent with the `concierge-display` skill.
+- Chromium on the Pi must allow microphone access for the kiosk profile once.
+
 ## Develop on Mac
 
 ```bash
