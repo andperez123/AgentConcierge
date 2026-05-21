@@ -13,6 +13,7 @@ import TaskReauth from "./pages/TaskReauth";
 import TaskRecovery from "./pages/TaskRecovery";
 import TaskVoice from "./pages/TaskVoice";
 import Work from "./pages/Work";
+import RemindersPage from "./pages/RemindersPage";
 import ProjectDetail from "./pages/ProjectDetail";
 
 export default function App() {
@@ -36,7 +37,7 @@ export default function App() {
         <Route path="/work" element={<Work />} />
         <Route path="/projects/:id" element={<ProjectDetail />} />
         <Route path="/notes" element={<Navigate to="/work?tab=notes" replace />} />
-        <Route path="/reminders" element={<Navigate to="/work?tab=reminders" replace />} />
+        <Route path="/reminders" element={<RemindersPage />} />
         <Route path="/incident/:alertId" element={<Incident />} />
         <Route path="/task/reauth" element={<TaskReauth />} />
         <Route path="/task/recovery" element={<TaskRecovery />} />
