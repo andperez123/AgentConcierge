@@ -97,91 +97,94 @@ export default function Settings() {
 
   return (
     <div className="page-shell">
-      <button
-        type="button"
-        className="back-btn"
-        onClick={() => navigate("/")}
-      >
-        ← Back
-      </button>
-
-      <h1 className="page-title">Settings</h1>
-      <p className="page-subtitle">Weather location and units</p>
-
-      <GoogleAuthCard
-        status={googleStatus ?? undefined}
-        onRefresh={() => void fetchGoogleAuthStatus(true).then(setGoogleStatus)}
-      />
-
-      <label className="field-label" htmlFor="city">
-        City or ZIP
-      </label>
-      <input
-        id="city"
-        className="field-input"
-        type="text"
-        value={query}
-        onChange={(e) => {
-          setQuery(e.target.value);
-          setSelected(null);
-        }}
-        placeholder="e.g. Chicago or 60601"
-        autoComplete="off"
-      />
-
-      <ActionTile
-        label={searching ? "Searching…" : "Find location"}
-        variant="secondary"
-        disabled={searching || !query.trim()}
-        onClick={() => void handleSearch()}
-      />
-
-      {results.length > 0 && (
-        <>
-          <p className="field-label">Pick your location</p>
-          <ul className="geocode-list">
-            {results.map((r) => (
-              <li key={`${r.latitude}-${r.longitude}`}>
-                <button
-                  type="button"
-                  className={`geocode-item ${selected?.latitude === r.latitude && selected?.longitude === r.longitude ? "geocode-item--selected" : ""}`}
-                  onClick={() => setSelected(r)}
-                >
-                  {r.name}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
-
-      <p className="field-label">Temperature</p>
-      <div className="unit-toggle">
+      <header className="page-shell__header">
         <button
           type="button"
-          className={`unit-toggle__btn ${tempUnit === "fahrenheit" ? "unit-toggle__btn--active" : ""}`}
-          onClick={() => void saveUnitsOnly("fahrenheit")}
+          className="back-btn"
+          onClick={() => navigate("/")}
         >
-          °F
+          ← Back
         </button>
-        <button
-          type="button"
-          className={`unit-toggle__btn ${tempUnit === "celsius" ? "unit-toggle__btn--active" : ""}`}
-          onClick={() => void saveUnitsOnly("celsius")}
-        >
-          °C
-        </button>
+        <h1 className="page-title">Settings</h1>
+        <p className="page-subtitle">Weather location and units</p>
+      </header>
+
+      <div className="page-shell__body">
+        <GoogleAuthCard
+          status={googleStatus ?? undefined}
+          onRefresh={() => void fetchGoogleAuthStatus(true).then(setGoogleStatus)}
+        />
+
+        <label className="field-label" htmlFor="city">
+          City or ZIP
+        </label>
+        <input
+          id="city"
+          className="field-input"
+          type="text"
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setSelected(null);
+          }}
+          placeholder="e.g. Chicago or 60601"
+          autoComplete="off"
+        />
+
+        <ActionTile
+          label={searching ? "Searching…" : "Find location"}
+          variant="secondary"
+          disabled={searching || !query.trim()}
+          onClick={() => void handleSearch()}
+        />
+
+        {results.length > 0 && (
+          <>
+            <p className="field-label">Pick your location</p>
+            <ul className="geocode-list">
+              {results.map((r) => (
+                <li key={`${r.latitude}-${r.longitude}`}>
+                  <button
+                    type="button"
+                    className={`geocode-item ${selected?.latitude === r.latitude && selected?.longitude === r.longitude ? "geocode-item--selected" : ""}`}
+                    onClick={() => setSelected(r)}
+                  >
+                    {r.name}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+
+        <p className="field-label">Temperature</p>
+        <div className="unit-toggle">
+          <button
+            type="button"
+            className={`unit-toggle__btn ${tempUnit === "fahrenheit" ? "unit-toggle__btn--active" : ""}`}
+            onClick={() => void saveUnitsOnly("fahrenheit")}
+          >
+            °F
+          </button>
+          <button
+            type="button"
+            className={`unit-toggle__btn ${tempUnit === "celsius" ? "unit-toggle__btn--active" : ""}`}
+            onClick={() => void saveUnitsOnly("celsius")}
+          >
+            °C
+          </button>
+        </div>
+
+        {error && <p className="field-error">{error}</p>}
+        {message && <p className="field-success">{message}</p>}
+
+        <ActionTile
+          label={saving ? "Saving…" : "Save location"}
+          variant="primary"
+          disabled={saving || (!selected && !query.trim())}
+          onClick={() => void handleSave()}
+        />
       </div>
-
-      {error && <p className="field-error">{error}</p>}
-      {message && <p className="field-success">{message}</p>}
-
-      <ActionTile
-        label={saving ? "Saving…" : "Save location"}
-        variant="primary"
-        disabled={saving || (!selected && !query.trim())}
-        onClick={() => void handleSave()}
-      />
     </div>
   );
 }

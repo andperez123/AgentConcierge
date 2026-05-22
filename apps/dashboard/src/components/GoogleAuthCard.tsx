@@ -1,10 +1,14 @@
 import { Link } from "react-router-dom";
-import { Shield, ChevronRight, RefreshCw } from "lucide-react";
+import { Shield, ChevronRight, RefreshCw, ExternalLink } from "lucide-react";
 import type { GoogleAuthStatus } from "@concierge/shared";
+
+const DRIVE_URL = "https://drive.google.com";
 
 interface Props {
   status: GoogleAuthStatus | null | undefined;
   onRefresh?: () => void;
+  onReauth?: () => void;
+  reauthBusy?: boolean;
   loading?: boolean;
 }
 
@@ -36,11 +40,16 @@ function tone(state: GoogleAuthStatus["state"]): string | undefined {
 export default function GoogleAuthCard({
   status,
   onRefresh,
+  onReauth,
+  reauthBusy,
   loading,
 }: Props) {
   const state = status?.state ?? "unknown";
   const valueLabel = label(state);
   const authTone = tone(state);
+  const needsReauth =
+    state === "expired" || state === "missing" || state === "unknown";
+  const connected = state === "connected";
 
   return (
     <article className="dash-card google-auth-card">
@@ -52,7 +61,7 @@ export default function GoogleAuthCard({
             type="button"
             className="google-auth-card__refresh"
             onClick={onRefresh}
-            disabled={loading}
+            disabled={loading || reauthBusy}
             aria-label="Refresh Google status"
           >
             <RefreshCw size={16} className={loading ? "spin" : ""} />
@@ -75,14 +84,35 @@ export default function GoogleAuthCard({
           </li>
         )}
       </ul>
-      {(state === "expired" || state === "missing") && (
-        <footer className="dash-card__footer">
+      <footer className="dash-card__footer google-auth-card__actions">
+        {connected && (
+          <a
+            href={DRIVE_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="dash-card__footer-btn"
+          >
+            Open Google Drive
+            <ExternalLink size={16} />
+          </a>
+        )}
+        {needsReauth && onReauth ? (
+          <button
+            type="button"
+            className="dash-card__footer-btn"
+            disabled={reauthBusy}
+            onClick={onReauth}
+          >
+            {reauthBusy ? "Reauthenticating…" : "Reauthenticate Google"}
+            <ChevronRight size={16} />
+          </button>
+        ) : needsReauth ? (
           <Link to="/task/reauth" className="dash-card__footer-btn">
             Fix authentication
             <ChevronRight size={16} />
           </Link>
-        </footer>
-      )}
+        ) : null}
+      </footer>
     </article>
   );
 }

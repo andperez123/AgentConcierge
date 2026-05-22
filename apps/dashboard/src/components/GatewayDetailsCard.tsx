@@ -51,7 +51,7 @@ export default function GatewayDetailsCard({ state }: Props) {
     <article className="dash-card gateway-details">
       {state?.api.mock && <span className="mock-banner">MOCK</span>}
       <Link to="/openclaw" className="gateway-details__header-link">
-        <span className="dash-card__header" style={{ marginBottom: 0 }}>
+        <span className="dash-card__header gateway-details__title">
           OpenClaw Gateway
         </span>
         <ChevronRight size={18} />

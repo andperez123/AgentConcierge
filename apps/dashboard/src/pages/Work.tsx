@@ -96,151 +96,155 @@ export default function Work() {
 
   return (
     <div className="page-shell page-shell--work">
-      <h1 className="page-title">Work</h1>
-      <nav className="work-tabs" aria-label="Work sections">
-        {(
-          [
-            ["all", "All"],
-            ["reminders", "Reminders"],
-            ["notes", "Notes"],
-            ["projects", "Projects"],
-          ] as const
-        ).map(([id, label]) => (
-          <button
-            key={id}
-            type="button"
-            className={`work-tabs__btn${tab === id ? " work-tabs__btn--active" : ""}`}
-            onClick={() => setTab(id)}
-          >
-            {label}
-          </button>
-        ))}
-      </nav>
+      <header className="page-shell__header">
+        <h1 className="page-title">Work</h1>
+        <nav className="work-tabs" aria-label="Work sections">
+          {(
+            [
+              ["all", "All"],
+              ["reminders", "Reminders"],
+              ["notes", "Notes"],
+              ["projects", "Projects"],
+            ] as const
+          ).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              className={`work-tabs__btn${tab === id ? " work-tabs__btn--active" : ""}`}
+              onClick={() => setTab(id)}
+            >
+              {label}
+            </button>
+          ))}
+        </nav>
 
-      {(tab === "all" || tab === "reminders" || tab === "notes") && (
-        <div className="work-create-bar">
-          <button
-            type="button"
-            className="work-create-bar__btn"
-            onClick={() => {
-              setCreateKind("reminder");
-              setDraft("");
-              setDueAt("");
-            }}
-          >
-            + Reminder
-          </button>
-          <button
-            type="button"
-            className="work-create-bar__btn"
-            onClick={() => {
-              setCreateKind("note");
-              setDraft("");
-            }}
-          >
-            + Note
-          </button>
-        </div>
-      )}
-
-      {createKind && (
-        <div className="work-inline-form">
-          <textarea
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            placeholder={
-              createKind === "reminder" ? "New reminder…" : "New note…"
-            }
-            rows={2}
-          />
-          {createKind === "reminder" && (
-            <input
-              type="datetime-local"
-              value={dueAt}
-              onChange={(e) => setDueAt(e.target.value)}
-            />
-          )}
-          <div className="work-inline-form__actions">
-            <button type="button" onClick={() => setCreateKind(null)}>
-              Cancel
+        {(tab === "all" || tab === "reminders" || tab === "notes") && (
+          <div className="work-create-bar">
+            <button
+              type="button"
+              className="work-create-bar__btn"
+              onClick={() => {
+                setCreateKind("reminder");
+                setDraft("");
+                setDueAt("");
+              }}
+            >
+              + Reminder
             </button>
             <button
               type="button"
-              className="action-card action-card--primary"
-              disabled={!draft.trim()}
-              onClick={() => void submitCreate()}
+              className="work-create-bar__btn"
+              onClick={() => {
+                setCreateKind("note");
+                setDraft("");
+              }}
             >
-              Add
+              + Note
             </button>
           </div>
-        </div>
-      )}
+        )}
 
-      {tab === "projects" ? (
-        <ul className="work-project-list">
-          {projects.length === 0 ? (
-            <p className="reminder-empty">No projects in ~/clawd/projects</p>
-          ) : (
-            projects.map((p) => (
-              <li key={p.id}>
-                <button
-                  type="button"
-                  className="list-page-item"
-                  onClick={() => navigate(`/projects/${p.id}`)}
-                >
-                  {p.name}
-                  <span className="list-page-item__meta">
-                    {[p.summary?.slice(0, 60), p.updatedAt?.slice(0, 10)]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </span>
-                </button>
-              </li>
-            ))
-          )}
-        </ul>
-      ) : (
-        <ul className="list-page-items">
-          {(tab === "reminders"
-            ? reminders.map((r) => ({ type: "reminder" as const, item: r }))
-            : tab === "notes"
-              ? notes.map((n) => ({ type: "note" as const, item: n }))
-              : combined
-          ).map((entry) => {
-            const key =
-              entry.type === "reminder"
-                ? `r-${entry.item.id}`
-                : `n-${entry.item.id}`;
-            const time =
-              entry.type === "reminder"
-                ? formatReminderTime(entry.item.dueAt)
-                : null;
-            return (
-              <li key={key}>
-                <button
-                  type="button"
-                  className="list-page-item"
-                  onClick={() =>
-                    openItem(
-                      entry.type === "reminder"
-                        ? { kind: "reminder", item: entry.item }
-                        : { kind: "note", item: entry.item },
-                    )
-                  }
-                >
-                  {entry.type === "reminder" ? "⏰ " : "📝 "}
-                  {entry.item.text}
-                  <span className="list-page-item__meta">
-                    {[entry.type, time, entry.item.source]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </span>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      )}
+        {createKind && (
+          <div className="work-inline-form">
+            <textarea
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              placeholder={
+                createKind === "reminder" ? "New reminder…" : "New note…"
+              }
+              rows={2}
+            />
+            {createKind === "reminder" && (
+              <input
+                type="datetime-local"
+                value={dueAt}
+                onChange={(e) => setDueAt(e.target.value)}
+              />
+            )}
+            <div className="work-inline-form__actions">
+              <button type="button" onClick={() => setCreateKind(null)}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="action-card action-card--primary"
+                disabled={!draft.trim()}
+                onClick={() => void submitCreate()}
+              >
+                Add
+              </button>
+            </div>
+          </div>
+        )}
+      </header>
+
+      <div className="page-shell__body">
+        {tab === "projects" ? (
+          <ul className="work-project-list">
+            {projects.length === 0 ? (
+              <p className="reminder-empty">No projects in ~/clawd/projects</p>
+            ) : (
+              projects.map((p) => (
+                <li key={p.id}>
+                  <button
+                    type="button"
+                    className="list-page-item"
+                    onClick={() => navigate(`/projects/${p.id}`)}
+                  >
+                    {p.name}
+                    <span className="list-page-item__meta">
+                      {[p.summary?.slice(0, 60), p.updatedAt?.slice(0, 10)]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </span>
+                  </button>
+                </li>
+              ))
+            )}
+          </ul>
+        ) : (
+          <ul className="list-page-items">
+            {(tab === "reminders"
+              ? reminders.map((r) => ({ type: "reminder" as const, item: r }))
+              : tab === "notes"
+                ? notes.map((n) => ({ type: "note" as const, item: n }))
+                : combined
+            ).map((entry) => {
+              const key =
+                entry.type === "reminder"
+                  ? `r-${entry.item.id}`
+                  : `n-${entry.item.id}`;
+              const time =
+                entry.type === "reminder"
+                  ? formatReminderTime(entry.item.dueAt)
+                  : null;
+              return (
+                <li key={key}>
+                  <button
+                    type="button"
+                    className="list-page-item"
+                    onClick={() =>
+                      openItem(
+                        entry.type === "reminder"
+                          ? { kind: "reminder", item: entry.item }
+                          : { kind: "note", item: entry.item },
+                      )
+                    }
+                  >
+                    {entry.type === "reminder" ? "⏰ " : "📝 "}
+                    {entry.item.text}
+                    <span className="list-page-item__meta">
+                      {[entry.type, time, entry.item.source]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
 
       <WorkItemSheet
         selection={selection}

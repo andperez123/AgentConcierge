@@ -150,6 +150,11 @@ export async function runReauth(): Promise<ActionResponse> {
   return res.json();
 }
 
+export async function runGoogleReauth(): Promise<ActionResponse> {
+  const res = await fetch(`${API}/openclaw/google/reauth`, { method: "POST" });
+  return res.json();
+}
+
 export async function fetchLogs(lines = 200): Promise<LogsResponse> {
   const res = await fetch(`${API}/openclaw/logs?lines=${lines}`);
   if (!res.ok) throw new Error("Logs fetch failed");

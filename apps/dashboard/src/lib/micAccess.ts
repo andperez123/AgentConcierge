@@ -1,3 +1,5 @@
+import { isKioskHardware, micReleaseDelayMs } from "./kioskDevice";
+
 export type MicAccessResult =
   | { ok: true }
   | { ok: false; error: string; recoverable: boolean };
@@ -21,7 +23,10 @@ async function queryMicPermission(): Promise<PermissionState | null> {
   }
 }
 
-/** Request mic permission once; later calls use Permissions API only (no second capture). */
+/**
+ * On Pi kiosk, Web Speech API owns the mic — skip getUserMedia unless forcing retry.
+ * Opening a MediaStream preflight causes "audio-capture" / NotReadableError on ALSA.
+ */
 export async function ensureMicrophoneAccess(
   force = false,
 ): Promise<MicAccessResult> {
@@ -43,7 +48,14 @@ export async function ensureMicrophoneAccess(
   }
 
   const perm = await queryMicPermission();
-  if (!force && perm === "granted") {
+  const kiosk = isKioskHardware();
+
+  if (!force && (perm === "granted" || kiosk)) {
+    micPreflightGranted = true;
+    return { ok: true };
+  }
+
+  if (kiosk && !force) {
     micPreflightGranted = true;
     return { ok: true };
   }
@@ -59,6 +71,7 @@ export async function ensureMicrophoneAccess(
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     for (const track of stream.getTracks()) track.stop();
+    await micReleaseDelay(micReleaseDelayMs());
     micPreflightGranted = true;
     return { ok: true };
   } catch (e) {
@@ -82,7 +95,7 @@ export async function ensureMicrophoneAccess(
       return {
         ok: false,
         error:
-          "Microphone is busy. Turn off Voice mode briefly, wait a second, then tap Retry.",
+          "Microphone is busy. Turn off Voice mode, tap Release mic, wait 2 seconds, then Retry.",
         recoverable: true,
       };
     }
@@ -100,7 +113,7 @@ export function mapSpeechRecognitionError(code: string): string {
     case "not-allowed":
       return "Microphone permission denied. Allow the mic in site settings, then tap Retry.";
     case "audio-capture":
-      return "Microphone is busy. Wait a moment or tap Retry — Voice mode re-listens quickly on Pi.";
+      return "Microphone is busy. Turn off Voice mode, tap Release mic, wait 2 seconds, then Retry.";
     case "no-speech":
       return "No speech heard. Try again closer to the mic.";
     case "network":
@@ -115,6 +128,15 @@ export function mapSpeechRecognitionError(code: string): string {
 }
 
 /** Pause so ALSA/Web Speech can release exclusive capture devices (e.g. Seeed WM8960). */
-export function micReleaseDelay(ms = 600): Promise<void> {
-  return new Promise((resolve) => window.setTimeout(resolve, ms));
+export function micReleaseDelay(ms?: number): Promise<void> {
+  const delay = ms ?? micReleaseDelayMs();
+  return new Promise((resolve) => window.setTimeout(resolve, delay));
+}
+
+/** Stop TTS and wait before starting another recognition session. */
+export async function releaseAudioForListening(): Promise<void> {
+  if (typeof window !== "undefined" && "speechSynthesis" in window) {
+    window.speechSynthesis.cancel();
+  }
+  await micReleaseDelay(micReleaseDelayMs());
 }

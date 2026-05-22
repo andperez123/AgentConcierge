@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { micReleaseDelayMs } from "../lib/kioskDevice";
 import {
   ensureMicrophoneAccess,
   mapSpeechRecognitionError,
   micReleaseDelay,
+  releaseAudioForListening,
   resetMicPreflight,
 } from "../lib/micAccess";
 
 type SpeechRecognitionCtor = new () => SpeechRecognition;
-
-const RELEASE_MS = 700;
 
 function getRecognitionCtor(): SpeechRecognitionCtor | null {
   const w = window as Window & {
@@ -59,7 +59,7 @@ export function useSpeechRecognition(options?: UseSpeechRecognitionOptions) {
     recognitionRef.current = null;
     setListening(false);
     startingRef.current = false;
-    releaseWaitRef.current = micReleaseDelay(RELEASE_MS);
+    releaseWaitRef.current = micReleaseDelay(micReleaseDelayMs());
   }, []);
 
   const stop = useCallback(() => {
@@ -74,6 +74,8 @@ export function useSpeechRecognition(options?: UseSpeechRecognitionOptions) {
         await releaseWaitRef.current;
         releaseWaitRef.current = null;
       }
+
+      await releaseAudioForListening();
 
       const Ctor = getRecognitionCtor();
       if (!Ctor) {
@@ -119,7 +121,7 @@ export function useSpeechRecognition(options?: UseSpeechRecognitionOptions) {
         setListening(false);
         startingRef.current = false;
         recognitionRef.current = null;
-        releaseWaitRef.current = micReleaseDelay(RELEASE_MS);
+        releaseWaitRef.current = micReleaseDelay(micReleaseDelayMs());
 
         const finalText = sessionFinalRef.current.trim();
         const withInterim = interimRef.current.trim();
@@ -136,7 +138,7 @@ export function useSpeechRecognition(options?: UseSpeechRecognitionOptions) {
         setListening(false);
         startingRef.current = false;
         recognitionRef.current = null;
-        releaseWaitRef.current = micReleaseDelay(RELEASE_MS);
+        releaseWaitRef.current = micReleaseDelay(micReleaseDelayMs());
 
         const msg = mapSpeechRecognitionError(ev.error);
         if (msg) {
@@ -174,7 +176,7 @@ export function useSpeechRecognition(options?: UseSpeechRecognitionOptions) {
         setListening(false);
         startingRef.current = false;
         recognitionRef.current = null;
-        releaseWaitRef.current = micReleaseDelay(RELEASE_MS);
+        releaseWaitRef.current = micReleaseDelay(micReleaseDelayMs());
         setError(e instanceof Error ? e.message : "Could not start listening");
         setMicRecoverable(true);
       }
@@ -186,6 +188,14 @@ export function useSpeechRecognition(options?: UseSpeechRecognitionOptions) {
     resetMicPreflight();
     void start({ forceMicPreflight: true });
   }, [start]);
+
+  const releaseMic = useCallback(() => {
+    stop();
+    resetMicPreflight();
+    void releaseAudioForListening();
+    setError(null);
+    setMicRecoverable(false);
+  }, [stop]);
 
   const reset = useCallback(() => {
     stop();
@@ -212,6 +222,7 @@ export function useSpeechRecognition(options?: UseSpeechRecognitionOptions) {
     start,
     stop,
     retryMic,
+    releaseMic,
     reset,
   };
 }

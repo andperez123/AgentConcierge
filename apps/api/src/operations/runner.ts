@@ -10,6 +10,7 @@ import {
   restartGateway,
   runDoctor,
 } from "../openclaw/adapter.js";
+import { invalidateGoogleAuthCache } from "../openclaw/google.js";
 import { emitDashboardEvent } from "../dashboard/events.js";
 import { MOCK_OPENCLAW } from "../config.js";
 
@@ -124,17 +125,35 @@ export async function runDoctorOperation(operationId: string): Promise<void> {
   }
 }
 
+const GOOGLE_REAUTH_ARG_SETS: string[][] = [
+  ["gateway", "auth", "refresh", "--json"],
+  ["gateway", "auth", "login", "--provider", "google", "--json"],
+  ["gateway", "auth", "login", "--json"],
+  ["integrations", "connect", "google", "--json"],
+  ["integrations", "auth", "google", "--json"],
+];
+
 export async function runReauthOperation(operationId: string): Promise<void> {
   updateOperation(operationId, {
     state: "running",
     startedAt: new Date().toISOString(),
   });
+  emitDashboardEvent("operation-updated", {
+    operationId,
+    state: "running",
+  });
 
   if (MOCK_OPENCLAW) {
+    invalidateGoogleAuthCache();
     updateOperation(operationId, {
       state: "succeeded",
-      message: "Mock reauth completed",
+      message: "Mock reauth completed — Google Drive ready",
       finishedAt: new Date().toISOString(),
+    });
+    emitDashboardEvent("operation-updated", {
+      operationId,
+      state: "succeeded",
+      message: "Mock reauth completed",
     });
     return;
   }
@@ -145,44 +164,62 @@ export async function runReauthOperation(operationId: string): Promise<void> {
   const { openclawEnv } = await import("../openclaw/env.js");
   const execFileAsync = promisify(execFile);
 
-  try {
-    const { stdout, stderr } = await execFileAsync(
-      OPENCLAW_BIN,
-      ["gateway", "auth", "refresh", "--json"],
-      { timeout: 60000, env: openclawEnv() },
-    );
-    const message = (stdout || stderr || "Reauth completed").slice(0, 500);
-    await getOpenClawStatus(true);
-    updateOperation(operationId, {
-      state: "succeeded",
-      message,
-      finishedAt: new Date().toISOString(),
-    });
-    emitDashboardEvent("operation-updated", {
-      operationId,
-      state: "succeeded",
-      message,
-    });
-  } catch (err: unknown) {
-    const e = err as { stderr?: string; message?: string };
-    const message = (
-      e.stderr ??
-      e.message ??
-      "Reauth failed — run openclaw gateway auth on the Pi"
-    ).toString();
-    updateOperation(operationId, {
-      state: "failed",
-      message,
-      finishedAt: new Date().toISOString(),
-      error: message,
-    });
-    recordIncident("error", "reauth", message, operationId);
-    emitDashboardEvent("operation-updated", {
-      operationId,
-      state: "failed",
-      message,
-    });
+  const attempts: string[] = [];
+  let lastErr = "";
+
+  for (const args of GOOGLE_REAUTH_ARG_SETS) {
+    const label = args.join(" ");
+    try {
+      const { stdout, stderr } = await execFileAsync(OPENCLAW_BIN, args, {
+        timeout: 120_000,
+        maxBuffer: 2 * 1024 * 1024,
+        env: openclawEnv(),
+      });
+      const out = (stdout || stderr || "").trim();
+      attempts.push(`${label}: ok`);
+      invalidateGoogleAuthCache();
+      await getOpenClawStatus(true);
+      const message = (
+        out.slice(0, 400) ||
+        "Google reauth completed. Save to Drive from Work items when connected."
+      ).slice(0, 500);
+      updateOperation(operationId, {
+        state: "succeeded",
+        message,
+        finishedAt: new Date().toISOString(),
+      });
+      emitDashboardEvent("operation-updated", {
+        operationId,
+        state: "succeeded",
+        message,
+      });
+      return;
+    } catch (err: unknown) {
+      const e = err as { stderr?: string; message?: string };
+      lastErr = (e.stderr ?? e.message ?? "failed").toString().slice(0, 200);
+      attempts.push(`${label}: ${lastErr}`);
+    }
   }
+
+  const message = [
+    "Google reauth failed on the Pi.",
+    "SSH in and run: openclaw gateway auth login",
+    "or: openclaw gateway auth refresh",
+    attempts.join(" · "),
+  ].join(" ");
+
+  updateOperation(operationId, {
+    state: "failed",
+    message: message.slice(0, 800),
+    finishedAt: new Date().toISOString(),
+    error: lastErr,
+  });
+  recordIncident("error", "reauth", message.slice(0, 500), operationId);
+  emitDashboardEvent("operation-updated", {
+    operationId,
+    state: "failed",
+    message: message.slice(0, 500),
+  });
 }
 
 export async function runRefreshProbesOperation(

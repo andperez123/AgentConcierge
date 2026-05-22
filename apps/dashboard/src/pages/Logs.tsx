@@ -59,66 +59,70 @@ export default function Logs() {
 
   return (
     <div className="page-shell page-shell--logs">
-      <button type="button" className="back-btn" onClick={() => navigate("/")}>
-        ← Back
-      </button>
-      <h1 className="page-title">Gateway logs</h1>
-      {path && <p className="page-subtitle">{path}</p>}
-
-      <div className="logs-toolbar">
-        <ActionTile
-          label={loading ? "Loading…" : "Refresh"}
-          variant="secondary"
-          onClick={() => void load()}
-        />
-        <button
-          type="button"
-          className={`chip${failuresOnly ? " chip--active" : ""}`}
-          onClick={() => setFailuresOnly((v) => !v)}
-        >
-          Failures only
+      <header className="page-shell__header">
+        <button type="button" className="back-btn" onClick={() => navigate("/")}>
+          ← Back
         </button>
-        <button
-          type="button"
-          className="chip"
-          onClick={() => void copyDiagnostic()}
-        >
-          {copied ? "Copied" : "Copy diagnostic"}
-        </button>
-      </div>
+        <h1 className="page-title">Gateway logs</h1>
+        {path && <p className="page-subtitle">{path}</p>}
 
-      <div className="logs-layout">
-        <aside className="logs-sidebar">
-          <h2 className="logs-sidebar__title">Recent incidents</h2>
-          {incidents.length === 0 ? (
-            <p className="logs-sidebar__empty">None</p>
-          ) : (
+        <div className="logs-toolbar">
+          <ActionTile
+            label={loading ? "Loading…" : "Refresh"}
+            variant="secondary"
+            onClick={() => void load()}
+          />
+          <button
+            type="button"
+            className={`chip${failuresOnly ? " chip--active" : ""}`}
+            onClick={() => setFailuresOnly((v) => !v)}
+          >
+            Failures only
+          </button>
+          <button
+            type="button"
+            className="chip"
+            onClick={() => void copyDiagnostic()}
+          >
+            {copied ? "Copied" : "Copy diagnostic"}
+          </button>
+        </div>
+      </header>
+
+      <div className="page-shell__body">
+        <div className="logs-layout">
+          <aside className="logs-sidebar">
+            <h2 className="logs-sidebar__title">Recent incidents</h2>
+            {incidents.length === 0 ? (
+              <p className="logs-sidebar__empty">None</p>
+            ) : (
+              <ul className="incident-list">
+                {incidents.map((i) => (
+                  <li key={i.id} className={`incident-item incident-item--${i.severity}`}>
+                    <span className="incident-item__msg">{i.message.slice(0, 80)}</span>
+                    <span className="incident-item__time">
+                      {new Date(i.createdAt).toLocaleTimeString()}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <h2 className="logs-sidebar__title">Restarts</h2>
             <ul className="incident-list">
-              {incidents.map((i) => (
-                <li key={i.id} className={`incident-item incident-item--${i.severity}`}>
-                  <span className="incident-item__msg">{i.message.slice(0, 80)}</span>
+              {restarts.map((r) => (
+                <li key={r.id} className="incident-item">
+                  <span className="incident-item__msg">
+                    {r.trigger} · exit {r.exitCode ?? "?"}
+                  </span>
                   <span className="incident-item__time">
-                    {new Date(i.createdAt).toLocaleTimeString()}
+                    {new Date(r.at).toLocaleString()}
                   </span>
                 </li>
               ))}
             </ul>
-          )}
-          <h2 className="logs-sidebar__title">Restarts</h2>
-          <ul className="incident-list">
-            {restarts.map((r) => (
-              <li key={r.id} className="incident-item">
-                <span className="incident-item__msg">
-                  {r.trigger} · exit {r.exitCode ?? "?"}
-                </span>
-                <span className="incident-item__time">
-                  {new Date(r.at).toLocaleString()}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </aside>
-        <pre className="logs-box">{displayed.join("\n")}</pre>
+          </aside>
+          <pre className="logs-box">{displayed.join("\n")}</pre>
+        </div>
       </div>
     </div>
   );

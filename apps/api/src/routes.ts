@@ -374,6 +374,18 @@ router.get("/openclaw/google/status", async (req, res) => {
   }
 });
 
+router.post("/openclaw/google/reauth", async (_req, res) => {
+  const op = startOperation("google-reauth");
+  void runReauthOperation(op.operationId);
+  const body: ActionResponse = {
+    ok: true,
+    message: "Google reauth queued — check Pi terminal if a code appears",
+    at: op.acceptedAt,
+    operationId: op.operationId,
+  };
+  res.status(202).json(body);
+});
+
 router.get("/projects", (_req, res) => {
   res.json(listProjects());
 });

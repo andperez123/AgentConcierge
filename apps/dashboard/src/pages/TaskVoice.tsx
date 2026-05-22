@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { Mic, Square, Send, Volume2, RotateCcw } from "lucide-react";
 import { postVoiceCommand } from "../api";
 import { useSpeechRecognition } from "../hooks/useSpeechRecognition";
+import { voiceListenGapMs } from "../lib/kioskDevice";
+import { releaseAudioForListening } from "../lib/micAccess";
 import { matchLocalVoiceCommand } from "../voice/controlPhrases";
 import {
   parseVoiceResult,
@@ -123,12 +125,13 @@ export default function TaskVoice() {
   });
 
   const speak = useCallback(
-    (text: string): Promise<void> => {
-      return new Promise((resolve) => {
-        if (!speakReplies || !("speechSynthesis" in window)) {
-          resolve();
-          return;
-        }
+    async (text: string): Promise<void> => {
+      speech.stop();
+      if (!speakReplies || !("speechSynthesis" in window)) {
+        await releaseAudioForListening();
+        return;
+      }
+      await new Promise<void>((resolve) => {
         const utter = new SpeechSynthesisUtterance(text);
         utter.rate = 1;
         utter.onend = () => resolve();
@@ -136,8 +139,9 @@ export default function TaskVoice() {
         window.speechSynthesis.cancel();
         window.speechSynthesis.speak(utter);
       });
+      await releaseAudioForListening();
     },
-    [speakReplies],
+    [speakReplies, speech],
   );
 
   const sendToAgent = useCallback(
@@ -218,29 +222,35 @@ export default function TaskVoice() {
   }, [speech]);
 
   scheduleListenRef.current = () => {
-    window.setTimeout(() => {
-      if (
-        voiceModeRef.current &&
-        statusRef.current !== "thinking" &&
-        statusRef.current !== "speaking"
-      ) {
-        startListening();
-      }
-    }, 1200);
+    void (async () => {
+      await releaseAudioForListening();
+      window.setTimeout(() => {
+        if (
+          voiceModeRef.current &&
+          statusRef.current !== "thinking" &&
+          statusRef.current !== "speaking"
+        ) {
+          startListening();
+        }
+      }, voiceListenGapMs());
+    })();
   };
 
   useEffect(() => {
     saveVoiceMode(voiceMode);
-    if (voiceMode && status === "idle" && !speech.listening) {
-      startListening();
-    }
     if (!voiceMode) {
-      speech.stop();
-      window.speechSynthesis?.cancel();
+      speech.releaseMic();
       abortRef.current?.abort();
       setStatus("idle");
+      return;
     }
-  }, [voiceMode]);
+    const t = window.setTimeout(() => {
+      if (statusRef.current === "idle" && !speech.listening) {
+        startListening();
+      }
+    }, voiceListenGapMs());
+    return () => window.clearTimeout(t);
+  }, [voiceMode, speech, startListening]);
 
   const draft = speech.transcript || manual;
 
@@ -290,19 +300,22 @@ export default function TaskVoice() {
 
   return (
     <div className="page-shell page-shell--voice">
-      <h1 className="page-title">Voice command</h1>
-      <p className="page-subtitle voice-page__hint">
-        Hands-free mode sends each phrase to OpenClaw. Desk items appear on{" "}
-        <button
-          type="button"
-          className="voice-page__link"
-          onClick={() => navigate("/work")}
-        >
-          Work
-        </button>
-        . Say &quot;stop listening&quot; to exit voice mode.
-      </p>
+      <header className="page-shell__header">
+        <h1 className="page-title">Voice command</h1>
+        <p className="page-subtitle voice-page__hint">
+          Hands-free mode sends each phrase to OpenClaw. Desk items appear on{" "}
+          <button
+            type="button"
+            className="voice-page__link"
+            onClick={() => navigate("/work")}
+          >
+            Work
+          </button>
+          . Say &quot;stop listening&quot; to exit voice mode.
+        </p>
+      </header>
 
+      <div className="page-shell__body">
       {!speech.supported && (
         <p className="voice-page__warn">
           Speech-to-text is not available in this browser. Type below or use
@@ -321,14 +334,23 @@ export default function TaskVoice() {
         <div className="voice-page__error-row">
           <p className="voice-page__error">{speech.error}</p>
           {speech.micRecoverable && (
-            <button
-              type="button"
-              className="voice-page__retry"
-              onClick={() => speech.retryMic()}
-            >
-              <RotateCcw size={18} />
-              Retry mic
-            </button>
+            <>
+              <button
+                type="button"
+                className="voice-page__retry"
+                onClick={() => speech.retryMic()}
+              >
+                <RotateCcw size={18} />
+                Retry mic
+              </button>
+              <button
+                type="button"
+                className="voice-page__retry"
+                onClick={() => speech.releaseMic()}
+              >
+                Release mic
+              </button>
+            </>
           )}
         </div>
       )}
@@ -468,6 +490,7 @@ export default function TaskVoice() {
           </ul>
         </div>
       )}
+      </div>
     </div>
   );
 }

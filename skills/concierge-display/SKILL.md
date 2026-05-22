@@ -24,6 +24,7 @@ Concierge API base: `http://127.0.0.1:3080/api`
 | Project breakdown | `GET /api/projects/:id` |
 | Agent action on reminder/note/project | `POST /api/work/:kind/:id/actions` |
 | Google auth status (display) | `GET /api/openclaw/google/status` |
+| Google reauth (Pi / Drive) | `POST /api/openclaw/google/reauth` |
 
 Do **not** use reminders for critical failures — use **alerts** instead.
 

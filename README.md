@@ -168,7 +168,7 @@ In a browser on the Pi (or another device on your LAN):
 You should see:
 
 - **API OK** (top right)
-- **4-zone home**: gateway health, attention queue, action strip, utilities
+- **3-column home** (1024×600): status row, reminders/notes · hero · auth/gateway, quick actions
 - Health label matching gateway (`HEALTHY`, `DEGRADED`, …)
 - **Restart / Doctor / Logs / Refresh** in the action strip
 - **5 taps on clock** opens `/debug`
@@ -195,6 +195,8 @@ Chromium opens fullscreen to the dashboard on the 7" display.
 | Auth probe fails | Set token in `/opt/concierge/.env` if you use gateway token auth |
 | Touch works but status wrong | Compare `curl localhost:3080/api/openclaw/status` with CLI output |
 | Kiosk blank screen | API must be up first; `curl localhost:3080/api/health` before starting kiosk |
+| Google auth / Drive | Open **Settings** or **Reauthenticate** (`/task/reauth`), tap **Reauthenticate Google**. On Pi: `openclaw gateway auth login` if the UI fails. Use `http://127.0.0.1:3080` on the kiosk (not LAN IP over HTTP). |
+| Mic busy on Voice | Turn off Voice mode, tap **Release mic**, wait 2s, **Retry mic**. Kiosk must use `http://127.0.0.1:3080`. Allow mic in Chromium site settings once. |
 
 Logs: `journalctl -u concierge-api -f`
 

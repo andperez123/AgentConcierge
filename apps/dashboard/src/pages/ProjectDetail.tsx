@@ -37,36 +37,45 @@ export default function ProjectDetail() {
 
   if (!id) {
     return (
-      <div className="page-shell">
-        <p className="reminder-empty">Invalid project</p>
+      <div className="page-shell page-shell--project">
+        <div className="page-shell__body">
+          <p className="reminder-empty">Invalid project</p>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="page-shell page-shell--project">
-      <Link to="/work?tab=projects" className="project-detail__back">
-        <ChevronLeft size={20} />
-        Projects
-      </Link>
-      {error && <p className="work-sheet__error">{error}</p>}
+      <header className="page-shell__header">
+        <Link to="/work?tab=projects" className="project-detail__back">
+          <ChevronLeft size={20} />
+          Projects
+        </Link>
+        {error && <p className="work-sheet__error">{error}</p>}
+        {data && (
+          <>
+            <h1 className="page-title">{data.project.name}</h1>
+            {data.project.summary && (
+              <p className="page-subtitle">{data.project.summary}</p>
+            )}
+            {data.project.path && (
+              <p className="project-detail__path">{data.project.path}</p>
+            )}
+            <button
+              type="button"
+              className="action-card action-card--primary project-detail__agent"
+              disabled={busy}
+              onClick={() => void askAgent()}
+            >
+              {busy ? "Sending…" : "Ask agent about this project"}
+            </button>
+          </>
+        )}
+      </header>
+
       {data && (
-        <>
-          <h1 className="page-title">{data.project.name}</h1>
-          {data.project.summary && (
-            <p className="page-subtitle">{data.project.summary}</p>
-          )}
-          {data.project.path && (
-            <p className="project-detail__path">{data.project.path}</p>
-          )}
-          <button
-            type="button"
-            className="action-card action-card--primary project-detail__agent"
-            disabled={busy}
-            onClick={() => void askAgent()}
-          >
-            {busy ? "Sending…" : "Ask agent about this project"}
-          </button>
+        <div className="page-shell__body">
           {data.sections.map((section) => (
             <section key={section.title} className="project-detail__section">
               <h2 className="project-detail__section-title">{section.title}</h2>
@@ -99,7 +108,7 @@ export default function ProjectDetail() {
               </ul>
             </section>
           )}
-        </>
+        </div>
       )}
     </div>
   );

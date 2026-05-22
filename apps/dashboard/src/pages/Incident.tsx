@@ -23,37 +23,42 @@ export default function Incident() {
 
   return (
     <div className="page-shell">
-      <button type="button" className="back-btn" onClick={() => navigate("/")}>
-        ← Back
-      </button>
-      <h1 className="page-title">{alert?.title ?? "Incident"}</h1>
-      <p className="page-subtitle">{alert?.message ?? "Not found"}</p>
-      {alert?.actions && (
-        <div className="action-strip action-strip--page">
-          {alert.actions.map((id) => (
-            <ActionCard
-              key={id}
-              action={{
-                id,
-                label: id,
-                permission: "auto",
-                enabled: true,
-                state: "idle",
-              }}
-              onClick={() => void postDashboardAction(id)}
-            />
-          ))}
-        </div>
-      )}
-      {alert && alert.status === "active" && (
-        <button
-          type="button"
-          className="action-card action-card--secondary"
-          onClick={() => void handleAck()}
-        >
-          Acknowledge
+      <header className="page-shell__header">
+        <button type="button" className="back-btn" onClick={() => navigate("/")}>
+          ← Back
         </button>
-      )}
+        <h1 className="page-title">{alert?.title ?? "Incident"}</h1>
+        <p className="page-subtitle">{alert?.message ?? "Not found"}</p>
+      </header>
+
+      <div className="page-shell__body">
+        {alert?.actions && (
+          <div className="action-strip action-strip--page">
+            {alert.actions.map((id) => (
+              <ActionCard
+                key={id}
+                action={{
+                  id,
+                  label: id,
+                  permission: "auto",
+                  enabled: true,
+                  state: "idle",
+                }}
+                onClick={() => void postDashboardAction(id)}
+              />
+            ))}
+          </div>
+        )}
+        {alert && alert.status === "active" && (
+          <button
+            type="button"
+            className="action-card action-card--secondary"
+            onClick={() => void handleAck()}
+          >
+            Acknowledge
+          </button>
+        )}
+      </div>
     </div>
   );
 }
