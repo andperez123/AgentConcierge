@@ -52,3 +52,11 @@ export function saveWeatherLocation(
 export function saveTempUnit(unit: TempUnit): void {
   setSetting(KEYS.tempUnit, unit);
 }
+
+export async function ensureDefaultWeatherLocation(): Promise<void> {
+  if (getSetting(KEYS.city)) return;
+  const { geocodeCity } = await import("./weather/service.js");
+  const geo = await geocodeCity("Chicago");
+  saveWeatherLocation(geo.name, geo.latitude, geo.longitude);
+  console.log(`Default weather location: ${geo.name}`);
+}

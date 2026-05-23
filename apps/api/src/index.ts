@@ -4,6 +4,11 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { DASHBOARD_DIST, MOCK_OPENCLAW, PORT } from "./config.js";
 import apiRouter from "./routes.js";
+import { ensureDefaultWeatherLocation } from "./settings.js";
+
+void ensureDefaultWeatherLocation().catch((err) => {
+  console.warn("Could not seed default weather location:", err);
+});
 
 const app = express();
 
