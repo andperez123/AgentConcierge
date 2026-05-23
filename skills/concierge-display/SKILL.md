@@ -154,7 +154,40 @@ curl -s -X PATCH http://127.0.0.1:3080/api/notes/3 \
 
 ## Projects
 
-Projects live under `~/clawd/projects/<slug>/` on the Pi.
+Projects live under `~/clawd/projects/<slug>/` on the Pi. The kiosk **home screen** shows up to four projects; tap through to `/projects/<slug>` for overview and tasks.
+
+**Do not create project folders via API** — create the directory on disk and maintain these files:
+
+| File | Purpose |
+| ---- | ------- |
+| `OVERVIEW.md` | Vision, status, next focus, context (`##` sections) |
+| `TASKS.md` | Checkbox tasks (`- [ ]` / `- [x]`), optional `##` phase headings |
+| `README.md` | Optional one-liner (fallback summary) |
+
+Example `OVERVIEW.md`:
+
+```markdown
+# NovaPay
+
+## Vision
+B2B invoicing for solo founders in LATAM.
+
+## Status
+idea
+
+## Next focus
+Validate pricing with 5 founder interviews.
+```
+
+Example `TASKS.md`:
+
+```markdown
+# Tasks
+
+## Discovery
+- [ ] Interview 5 founders
+- [x] Define ICP
+```
 
 ```bash
 curl -s http://127.0.0.1:3080/api/projects
@@ -165,6 +198,10 @@ curl -s -X POST http://127.0.0.1:3080/api/projects/sync \
   -H 'Content-Type: application/json' \
   -d '{"id":"revenue-factory","name":"Revenue Factory","summary":"…"}'
 ```
+
+Voice: `navigateTo: "/projects/novapay"` after summarizing; `GET /api/dashboard/state` includes `widgets.projects` for the home card.
+
+When the operator starts a **new startup/idea project**, ask for: slug, display name, vision, status, task breakdown, and next focus — then write `OVERVIEW.md` + `TASKS.md` and link time-bound work via `POST /api/reminders` with `projectId`.
 
 ## Work entity actions (agent + Drive via OpenClaw)
 

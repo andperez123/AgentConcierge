@@ -4,12 +4,22 @@ import type {
   OpenClawProject,
   ProjectBreakdown,
   ProjectBreakdownSection,
+  ProjectOverview,
+  ProjectTask,
   SyncProjectBody,
 } from "@concierge/shared";
 import { OPENCLAW_PROJECTS_DIR } from "../config.js";
 import { db } from "../db.js";
 import { listReminders } from "../reminders.js";
 import { listNotes } from "../notes.js";
+import {
+  computeTaskProgress,
+  firstParagraphForSummary,
+  parseOverviewMarkdown,
+  parseTasksMarkdown,
+} from "./projectParse.js";
+
+const CORE_MD = new Set(["README.md", "BREAKDOWN.md", "OVERVIEW.md", "TASKS.md"]);
 
 function slugToName(slug: string): string {
   return slug
@@ -18,17 +28,57 @@ function slugToName(slug: string): string {
     .join(" ");
 }
 
-function readPreview(filePath: string, max = 200): string {
+function readFileUtf8(filePath: string): string | null {
   try {
-    const raw = readFileSync(filePath, "utf8");
-    const h1 = raw.match(/^#\s+(.+)$/m);
-    const body = (h1 ? raw.slice(raw.indexOf(h1[0]) + h1[0].length) : raw)
-      .replace(/^#+\s+/gm, "")
-      .trim();
-    return body.slice(0, max).trim();
+    return readFileSync(filePath, "utf8");
   } catch {
-    return "";
+    return null;
   }
+}
+
+function readPreview(filePath: string, max = 200): string {
+  const raw = readFileUtf8(filePath);
+  if (!raw) return "";
+  const h1 = raw.match(/^#\s+(.+)$/m);
+  const body = (h1 ? raw.slice(raw.indexOf(h1[0]) + h1[0].length) : raw)
+    .replace(/^#+\s+/gm, "")
+    .trim();
+  return body.slice(0, max).trim();
+}
+
+function readOverview(dirPath: string): ProjectOverview | undefined {
+  const raw = readFileUtf8(join(dirPath, "OVERVIEW.md"));
+  if (!raw) return undefined;
+  return parseOverviewMarkdown(raw);
+}
+
+function readTasks(dirPath: string): ProjectTask[] {
+  const raw = readFileUtf8(join(dirPath, "TASKS.md"));
+  if (!raw) return [];
+  return parseTasksMarkdown(raw);
+}
+
+function enrichProjectFromDir(
+  base: OpenClawProject,
+  dirPath: string,
+): OpenClawProject {
+  const overview = readOverview(dirPath);
+  const tasks = readTasks(dirPath);
+  const taskProgress = computeTaskProgress(tasks);
+
+  let summary = base.summary;
+  const overviewRaw = readFileUtf8(join(dirPath, "OVERVIEW.md"));
+  if (overviewRaw) {
+    summary = firstParagraphForSummary(overviewRaw, 280) || summary;
+  }
+
+  return {
+    ...base,
+    summary,
+    status: overview?.status,
+    nextFocus: overview?.nextFocus,
+    taskProgress,
+  };
 }
 
 function scanProjectDir(dirPath: string, id: string): OpenClawProject {
@@ -40,11 +90,18 @@ function scanProjectDir(dirPath: string, id: string): OpenClawProject {
   }
 
   let summary: string | undefined;
-  for (const name of ["README.md", "BREAKDOWN.md"]) {
-    const p = join(dirPath, name);
-    if (existsSync(p)) {
-      summary = readPreview(p, 280);
-      break;
+  const overviewPath = join(dirPath, "OVERVIEW.md");
+  if (existsSync(overviewPath)) {
+    const raw = readFileUtf8(overviewPath);
+    if (raw) summary = firstParagraphForSummary(raw, 280);
+  }
+  if (!summary) {
+    for (const name of ["README.md", "BREAKDOWN.md"]) {
+      const p = join(dirPath, name);
+      if (existsSync(p)) {
+        summary = readPreview(p, 280);
+        break;
+      }
     }
   }
   if (!summary) {
@@ -57,13 +114,14 @@ function scanProjectDir(dirPath: string, id: string): OpenClawProject {
     }
   }
 
-  return {
+  const base: OpenClawProject = {
     id,
     name: slugToName(id),
     summary,
     updatedAt,
     path: dirPath,
   };
+  return enrichProjectFromDir(base, dirPath);
 }
 
 function buildSectionsFromDir(dirPath: string): ProjectBreakdownSection[] {
@@ -73,18 +131,13 @@ function buildSectionsFromDir(dirPath: string): ProjectBreakdownSection[] {
     const mdFiles = entries
       .filter((e) => e.isFile() && e.name.endsWith(".md"))
       .map((e) => e.name)
+      .filter((n) => !CORE_MD.has(n))
       .sort();
 
-    const priority = ["README.md", "BREAKDOWN.md"];
-    const ordered = [
-      ...priority.filter((n) => mdFiles.includes(n)),
-      ...mdFiles.filter((n) => !priority.includes(n)),
-    ];
-
-    if (ordered.length > 0) {
+    if (mdFiles.length > 0) {
       sections.push({
         title: "Documents",
-        items: ordered.map((name) => ({
+        items: mdFiles.map((name) => ({
           label: name.replace(/\.md$/i, ""),
           detail: readPreview(join(dirPath, name)),
         })),
@@ -172,8 +225,15 @@ export function getProjectBreakdown(id: string): ProjectBreakdown | null {
 
   const dirPath = join(OPENCLAW_PROJECTS_DIR, id);
   let sections: ProjectBreakdownSection[] = [];
+  let overview: ProjectOverview | undefined;
+  let tasks: ProjectTask[] = [];
+  let taskProgress = project.taskProgress;
+
   if (existsSync(dirPath)) {
     sections = buildSectionsFromDir(dirPath);
+    overview = readOverview(dirPath);
+    tasks = readTasks(dirPath);
+    taskProgress = computeTaskProgress(tasks) ?? taskProgress;
   } else {
     const row = db
       .prepare(`SELECT breakdown_json FROM project_cache WHERE id = ?`)
@@ -192,6 +252,9 @@ export function getProjectBreakdown(id: string): ProjectBreakdown | null {
     sections,
     linkedReminders: listReminders(id),
     linkedNotes: listNotes(id),
+    overview,
+    tasks: tasks.length > 0 ? tasks : undefined,
+    taskProgress,
   };
 }
 

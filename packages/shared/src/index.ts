@@ -169,6 +169,7 @@ export interface DashboardState {
     hero?: HeroDisplay | null;
     reminders: Reminder[];
     notes: Note[];
+    projects: DashboardProjectWidget[];
   };
   integrations?: {
     google?: GoogleAuthStatus;
@@ -346,6 +347,32 @@ export interface OpenClawProject {
   summary?: string;
   updatedAt?: string;
   path?: string;
+  status?: string;
+  nextFocus?: string;
+  taskProgress?: ProjectTaskProgress;
+}
+
+export interface ProjectTaskProgress {
+  done: number;
+  total: number;
+}
+
+export interface ProjectOverviewSection {
+  title: string;
+  body: string;
+}
+
+export interface ProjectOverview {
+  status?: string;
+  sections: ProjectOverviewSection[];
+  nextFocus?: string;
+}
+
+export interface ProjectTask {
+  id: string;
+  text: string;
+  done: boolean;
+  group?: string;
 }
 
 export interface ProjectBreakdownSection {
@@ -358,6 +385,17 @@ export interface ProjectBreakdown {
   sections: ProjectBreakdownSection[];
   linkedReminders: Reminder[];
   linkedNotes: Note[];
+  overview?: ProjectOverview;
+  tasks?: ProjectTask[];
+  taskProgress?: ProjectTaskProgress;
+}
+
+export interface DashboardProjectWidget {
+  id: string;
+  name: string;
+  status?: string;
+  nextFocus?: string;
+  taskProgress?: ProjectTaskProgress;
 }
 
 export interface SyncProjectBody {

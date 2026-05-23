@@ -8,6 +8,7 @@ import { getOpenClawStatus } from "../openclaw/adapter.js";
 import { getWeather } from "../weather/service.js";
 import { listReminders } from "../reminders.js";
 import { listNotes } from "../notes.js";
+import { listProjects } from "../openclaw/projects.js";
 import { getGoogleAuthStatus } from "../openclaw/google.js";
 import { getHeroDisplay } from "../display/hero.js";
 import {
@@ -145,6 +146,13 @@ export async function buildDashboardState(force = false): Promise<DashboardState
       hero: getHeroDisplay(),
       reminders: listReminders().slice(0, 5),
       notes: listNotes().slice(0, 3),
+      projects: listProjects().slice(0, 4).map((p) => ({
+        id: p.id,
+        name: p.name,
+        status: p.status,
+        nextFocus: p.nextFocus,
+        taskProgress: p.taskProgress,
+      })),
     },
     device,
     api: { ok: true, version: VERSION, mock: MOCK_OPENCLAW },

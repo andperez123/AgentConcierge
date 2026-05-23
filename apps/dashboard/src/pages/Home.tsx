@@ -6,7 +6,7 @@ import RemindersPanel from "../components/RemindersPanel";
 import NotesPanel from "../components/NotesPanel";
 import HeroCard from "../components/HeroCard";
 import GatewayDetailsCard from "../components/GatewayDetailsCard";
-import GoogleAuthCard from "../components/GoogleAuthCard";
+import ProjectsCard from "../components/ProjectsCard";
 import QuickActionsRow from "../components/QuickActionsRow";
 import { useDashboardCommands } from "../hooks/useDashboardCommands";
 import { useDashboardState } from "../hooks/useDashboardState";
@@ -75,11 +75,7 @@ export default function Home() {
         </div>
         <HeroCard hero={state?.widgets.hero} />
         <div className="home-middle-col">
-          <GoogleAuthCard
-            status={state?.integrations?.google}
-            onRefresh={() => void refresh(true)}
-            loading={pendingAction === "refresh-probes"}
-          />
+          <ProjectsCard projects={state?.widgets.projects ?? []} />
           <GatewayDetailsCard state={state} />
         </div>
       </section>

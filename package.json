@@ -11,7 +11,7 @@
     "dev:dashboard": "npm run dev -w @concierge/dashboard",
     "build": "npm run build -w @concierge/shared && npm run build -w @concierge/dashboard && npm run build -w @concierge/api",
     "start": "npm run start -w @concierge/api",
-    "test": "node --import tsx --test apps/dashboard/src/voice/parseVoiceResult.test.ts apps/api/src/voice/context.test.ts"
+    "test": "node --import tsx --test apps/dashboard/src/voice/parseVoiceResult.test.ts apps/api/src/voice/context.test.ts apps/api/src/openclaw/projects.test.ts"
   },
   "engines": {
     "node": ">=20"

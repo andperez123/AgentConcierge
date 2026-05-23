@@ -10,6 +10,7 @@ import {
 } from "../api";
 import WorkItemSheet, { type WorkItem } from "../components/WorkItemSheet";
 import { formatReminderTime } from "../utils/format";
+import { formatProjectMeta } from "../utils/projectFormat";
 
 type Tab = "all" | "reminders" | "notes" | "projects";
 
@@ -192,10 +193,8 @@ export default function Work() {
                     onClick={() => navigate(`/projects/${p.id}`)}
                   >
                     {p.name}
-                    <span className="list-page-item__meta">
-                      {[p.summary?.slice(0, 60), p.updatedAt?.slice(0, 10)]
-                        .filter(Boolean)
-                        .join(" · ")}
+                    <span className="list-page-item__meta list-page-item__meta--truncate">
+                      {formatProjectMeta(p)}
                     </span>
                   </button>
                 </li>
