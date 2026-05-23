@@ -191,6 +191,7 @@ Chromium opens fullscreen to the dashboard on the 7" display.
 | Symptom | Check |
 |--------|--------|
 | API down | `sudo systemctl status concierge-api` and `journalctl -u concierge-api -f` |
+| Gateway status flapping | Run the probe comparison loop below; if raw `/readyz` is stable but Concierge flaps, tune probe env vars in `/opt/concierge/.env` |
 | OpenClaw always offline | `openclaw gateway status --json`; gateway running? `systemctl --user status` for openclaw |
 | Auth probe fails | Set token in `/opt/concierge/.env` if you use gateway token auth |
 | Touch works but status wrong | Compare `curl localhost:3080/api/openclaw/status` with CLI output |
@@ -201,3 +202,17 @@ Chromium opens fullscreen to the dashboard on the 7" display.
 Logs: `journalctl -u concierge-api -f`
 
 Restart API: `sudo systemctl restart concierge-api`
+
+**Gateway status flapping (compare Concierge vs gateway):**
+
+```bash
+while true; do
+  date -Is
+  curl -sf --max-time 5 http://127.0.0.1:18789/readyz && echo readyz=ok || echo readyz=fail
+  curl -sf http://127.0.0.1:3080/api/openclaw/status | jq '{state, readyz, reachable: .probe.reachable, probeFailures, checkedAt}'
+  sleep 5
+done
+```
+
+- If **raw `/readyz` also fails** intermittently, inspect OpenClaw gateway logs (`~/.openclaw/logs/gateway.log`) and `systemctl --user status openclaw-gateway.service`.
+- If **raw `/readyz` is stable but Concierge shows `probeFailures` climbing**, increase `OPENCLAW_PROBE_TIMEOUT_MS` or `PROBE_FAILURE_THRESHOLD` in `/opt/concierge/.env`, then `sudo systemctl restart concierge-api`.

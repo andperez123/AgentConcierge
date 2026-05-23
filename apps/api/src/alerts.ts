@@ -3,6 +3,8 @@ import { db } from "./db.js";
 import { randomUUID } from "node:crypto";
 import { emitDashboardEvent } from "./dashboard/events.js";
 
+let lastSyncedHealthState: string | null = null;
+
 function rowToAlert(row: {
   id: string;
   level: string;
@@ -95,13 +97,42 @@ export function deleteAlert(id: string): boolean {
 
 export function syncHealthAlert(healthSummary: string, state: string): void {
   if (state === "healthy" || state === "restarting") {
-    db.prepare(
-      `UPDATE alerts SET status = 'resolved' WHERE id = 'gateway-health' AND status = 'active'`,
-    ).run();
+    const resolved = db
+      .prepare(
+        `UPDATE alerts SET status = 'resolved' WHERE id = 'gateway-health' AND status = 'active'`,
+      )
+      .run();
+    if (resolved.changes > 0) {
+      lastSyncedHealthState = state;
+      emitDashboardEvent("alert-updated", {
+        alertId: "gateway-health",
+        status: "resolved",
+      });
+    } else if (lastSyncedHealthState !== state) {
+      lastSyncedHealthState = state;
+    }
     return;
   }
+
+  if (lastSyncedHealthState === state) {
+    return;
+  }
+
+  const existing = db
+    .prepare(
+      `SELECT level, message FROM alerts WHERE id = 'gateway-health' AND status = 'active'`,
+    )
+    .get() as { level: string; message: string } | undefined;
+
   const level: AlertLevel =
     state === "blocked" ? "critical" : state === "action_needed" ? "error" : "warning";
+
+  if (existing && existing.level === level && existing.message === healthSummary) {
+    lastSyncedHealthState = state;
+    return;
+  }
+
+  lastSyncedHealthState = state;
   createAlert({
     id: "gateway-health",
     level,

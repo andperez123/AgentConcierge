@@ -8,6 +8,10 @@ import {
   MOCK_OPENCLAW,
   OPENCLAW_BIN,
   OPENCLAW_GATEWAY_PORT,
+  OPENCLAW_PROBE_RETRIES,
+  OPENCLAW_PROBE_TIMEOUT_MS,
+  PROBE_FAILURE_THRESHOLD,
+  PROBE_RECOVERY_GRACE_MS,
   STATUS_CACHE_MS,
 } from "../config.js";
 import { getLastRestartAt } from "../db.js";
@@ -17,8 +21,15 @@ const execFileAsync = promisify(execFile);
 
 let cachedStatus: OpenClawStatus | null = null;
 let cachedAt = 0;
+let lastGoodStatus: OpenClawStatus | null = null;
+let lastGoodAt = 0;
+let consecutiveProbeFailures = 0;
 let mockOnline = true;
 let statusInFlight: Promise<OpenClawStatus> | null = null;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 function readGatewayPort(): number {
   try {
@@ -60,19 +71,81 @@ async function runOpenClaw(
   }
 }
 
-async function fetchHealthz(port: number): Promise<"ok" | "not_ready" | "unknown"> {
+async function fetchHealthzOnce(
+  port: number,
+): Promise<"ok" | "not_ready" | "unknown"> {
   try {
     const readyRes = await fetch(`http://127.0.0.1:${port}/readyz`, {
-      signal: AbortSignal.timeout(3000),
+      signal: AbortSignal.timeout(OPENCLAW_PROBE_TIMEOUT_MS),
     });
     if (readyRes.ok) return "ok";
     const healthRes = await fetch(`http://127.0.0.1:${port}/healthz`, {
-      signal: AbortSignal.timeout(3000),
+      signal: AbortSignal.timeout(OPENCLAW_PROBE_TIMEOUT_MS),
     });
     return healthRes.ok ? "not_ready" : "unknown";
   } catch {
     return "unknown";
   }
+}
+
+async function fetchHealthz(
+  port: number,
+): Promise<"ok" | "not_ready" | "unknown"> {
+  const attempts = Math.max(1, OPENCLAW_PROBE_RETRIES);
+  let last: "ok" | "not_ready" | "unknown" = "unknown";
+  for (let i = 0; i < attempts; i++) {
+    last = await fetchHealthzOnce(port);
+    if (last !== "unknown") return last;
+    if (i < attempts - 1) await sleep(200);
+  }
+  return last;
+}
+
+function buildOfflineStatus(checkedAt: string): OpenClawStatus {
+  return {
+    state: "offline",
+    service: { running: false, unit: "openclaw-gateway.service" },
+    probe: { reachable: false },
+    readyz: "unknown",
+    lastRestartAt: getLastRestartAt(),
+    checkedAt,
+    probeFailures: consecutiveProbeFailures,
+  };
+}
+
+function applyProbeHysteresis(
+  freshStatus: OpenClawStatus,
+  probeFailed: boolean,
+  now: number,
+): OpenClawStatus {
+  if (probeFailed) {
+    consecutiveProbeFailures += 1;
+    const withinGrace =
+      lastGoodStatus !== null && now - lastGoodAt <= PROBE_RECOVERY_GRACE_MS;
+    if (
+      consecutiveProbeFailures < PROBE_FAILURE_THRESHOLD &&
+      withinGrace &&
+      lastGoodStatus
+    ) {
+      return {
+        ...lastGoodStatus,
+        checkedAt: freshStatus.checkedAt,
+        stale: true,
+        probeFailures: consecutiveProbeFailures,
+      };
+    }
+    return {
+      ...buildOfflineStatus(freshStatus.checkedAt),
+      stale: true,
+    };
+  }
+
+  consecutiveProbeFailures = 0;
+  if (freshStatus.state === "online" || freshStatus.state === "degraded") {
+    lastGoodStatus = freshStatus;
+    lastGoodAt = now;
+  }
+  return { ...freshStatus, probeFailures: 0 };
 }
 
 function mapState(
@@ -195,7 +268,7 @@ async function probeStatus(force: boolean): Promise<OpenClawStatus> {
     }
   }
 
-  const status: OpenClawStatus = {
+  const freshStatus: OpenClawStatus = {
     state: mapState(
       parsed.service?.running ?? serviceRunning,
       parsed.probe?.reachable ?? reachable,
@@ -209,6 +282,8 @@ async function probeStatus(force: boolean): Promise<OpenClawStatus> {
     lastRestartAt: getLastRestartAt(),
     checkedAt,
   };
+
+  const status = applyProbeHysteresis(freshStatus, !reachable, now);
 
   cachedStatus = status;
   cachedAt = now;
@@ -271,6 +346,7 @@ export async function restartGateway(
   }
 
   cachedStatus = null;
+  consecutiveProbeFailures = 0;
   const message = stdout || stderr || (code === 0 ? "Restarted" : "Restart failed");
   return { ok: code === 0, message };
 }

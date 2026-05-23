@@ -28,6 +28,18 @@ export const DATA_DIR =
 export const DASHBOARD_DIST =
   process.env.DASHBOARD_DIST ?? join(__dirname, "..", "..", "dashboard", "dist");
 export const STATUS_CACHE_MS = 2000;
+export const OPENCLAW_PROBE_TIMEOUT_MS = Number(
+  process.env.OPENCLAW_PROBE_TIMEOUT_MS ?? 5000,
+);
+export const OPENCLAW_PROBE_RETRIES = Number(
+  process.env.OPENCLAW_PROBE_RETRIES ?? 2,
+);
+export const PROBE_FAILURE_THRESHOLD = Number(
+  process.env.PROBE_FAILURE_THRESHOLD ?? 3,
+);
+export const PROBE_RECOVERY_GRACE_MS = Number(
+  process.env.PROBE_RECOVERY_GRACE_MS ?? 30000,
+);
 export const WEATHER_CACHE_MINUTES = Number(
   process.env.WEATHER_CACHE_MINUTES ?? 5,
 );

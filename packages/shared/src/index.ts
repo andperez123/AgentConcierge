@@ -17,6 +17,8 @@ export interface OpenClawStatus {
   checkedAt: string;
   stale?: boolean;
   mock?: boolean;
+  /** Consecutive failed HTTP probes (for diagnostics). */
+  probeFailures?: number;
 }
 
 export type HealthState =

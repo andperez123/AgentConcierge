@@ -1,9 +1,12 @@
 import { Outlet } from "react-router-dom";
 import BottomNav from "./BottomNav";
-import { useDashboardState } from "../hooks/useDashboardState";
+import {
+  DashboardStateProvider,
+  useDashboardStateContext,
+} from "../context/DashboardStateContext";
 
-export default function AppShell() {
-  const { state } = useDashboardState();
+function AppShellInner() {
+  const { state } = useDashboardStateContext();
 
   return (
     <div className="app-shell">
@@ -12,5 +15,13 @@ export default function AppShell() {
       </main>
       <BottomNav state={state} />
     </div>
+  );
+}
+
+export default function AppShell() {
+  return (
+    <DashboardStateProvider>
+      <AppShellInner />
+    </DashboardStateProvider>
   );
 }
