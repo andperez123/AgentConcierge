@@ -50,12 +50,14 @@ export async function ensureMicrophoneAccess(
   const perm = await queryMicPermission();
   const kiosk = isKioskHardware();
 
-  if (!force && (perm === "granted" || kiosk)) {
+  // Pi kiosk: Web Speech owns ALSA — never open a parallel MediaStream (even on Retry).
+  if (kiosk) {
+    if (force) micPreflightGranted = false;
     micPreflightGranted = true;
     return { ok: true };
   }
 
-  if (kiosk && !force) {
+  if (!force && perm === "granted") {
     micPreflightGranted = true;
     return { ok: true };
   }

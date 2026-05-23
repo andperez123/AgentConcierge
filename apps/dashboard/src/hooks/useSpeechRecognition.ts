@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { micReleaseDelayMs } from "../lib/kioskDevice";
+import {
+  isKioskHardware,
+  micCaptureRetryDelayMs,
+  micReleaseDelayMs,
+} from "../lib/kioskDevice";
 import {
   ensureMicrophoneAccess,
   mapSpeechRecognitionError,
@@ -16,6 +20,18 @@ function getRecognitionCtor(): SpeechRecognitionCtor | null {
     webkitSpeechRecognition?: SpeechRecognitionCtor;
   };
   return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
+}
+
+/** Serialize mic start/stop so Pi ALSA never sees overlapping capture. */
+let micOpChain: Promise<void> = Promise.resolve();
+
+function enqueueMicOp<T>(fn: () => Promise<T>): Promise<T> {
+  const run = micOpChain.then(fn, fn);
+  micOpChain = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
 }
 
 export interface UseSpeechRecognitionOptions {
@@ -37,38 +53,60 @@ export function useSpeechRecognition(options?: UseSpeechRecognitionOptions) {
   const sessionFinalRef = useRef("");
   const interimRef = useRef("");
   const startingRef = useRef(false);
+  const listeningRef = useRef(false);
+  const intentionalTeardownRef = useRef(false);
   const releaseWaitRef = useRef<Promise<void> | null>(null);
 
   useEffect(() => {
     setSupported(getRecognitionCtor() !== null);
   }, []);
 
-  const releaseRecognition = useCallback(() => {
-    const rec = recognitionRef.current;
-    if (rec) {
-      try {
-        rec.abort();
-      } catch {
-        try {
-          rec.stop();
-        } catch {
-          /* ignore */
-        }
-      }
+  const waitForMicRelease = useCallback(async () => {
+    if (releaseWaitRef.current) {
+      await releaseWaitRef.current;
+      releaseWaitRef.current = null;
     }
-    recognitionRef.current = null;
-    setListening(false);
-    startingRef.current = false;
-    releaseWaitRef.current = micReleaseDelay(micReleaseDelayMs());
+    await micReleaseDelay(micReleaseDelayMs());
   }, []);
 
-  const stop = useCallback(() => {
-    releaseRecognition();
-  }, [releaseRecognition]);
+  const teardownRecognition = useCallback(
+    (opts?: { scheduleRelease?: boolean }) => {
+      intentionalTeardownRef.current = true;
+      const rec = recognitionRef.current;
+      if (rec) {
+        try {
+          rec.abort();
+        } catch {
+          try {
+            rec.stop();
+          } catch {
+            /* ignore */
+          }
+        }
+      }
+      recognitionRef.current = null;
+      listeningRef.current = false;
+      setListening(false);
+      startingRef.current = false;
+      queueMicrotask(() => {
+        intentionalTeardownRef.current = false;
+      });
+      if (opts?.scheduleRelease !== false) {
+        releaseWaitRef.current = micReleaseDelay(micReleaseDelayMs());
+      }
+    },
+    [],
+  );
 
-  const start = useCallback(
-    async (opts?: { forceMicPreflight?: boolean }) => {
-      if (startingRef.current || listening) return;
+  const stop = useCallback(() => {
+    teardownRecognition();
+  }, [teardownRecognition]);
+
+  const runStart = useCallback(
+    async (opts?: { forceMicPreflight?: boolean; captureAttempt?: number }) => {
+      const captureAttempt = opts?.captureAttempt ?? 0;
+
+      if (startingRef.current || listeningRef.current) return;
 
       if (releaseWaitRef.current) {
         await releaseWaitRef.current;
@@ -76,6 +114,8 @@ export function useSpeechRecognition(options?: UseSpeechRecognitionOptions) {
       }
 
       await releaseAudioForListening();
+      teardownRecognition();
+      await waitForMicRelease();
 
       const Ctor = getRecognitionCtor();
       if (!Ctor) {
@@ -90,12 +130,6 @@ export function useSpeechRecognition(options?: UseSpeechRecognitionOptions) {
       setInterim("");
       interimRef.current = "";
       sessionFinalRef.current = "";
-
-      releaseRecognition();
-      if (releaseWaitRef.current) {
-        await releaseWaitRef.current;
-        releaseWaitRef.current = null;
-      }
 
       const mic = await ensureMicrophoneAccess(opts?.forceMicPreflight ?? false);
       if (!mic.ok) {
@@ -113,11 +147,15 @@ export function useSpeechRecognition(options?: UseSpeechRecognitionOptions) {
       rec.maxAlternatives = 1;
 
       rec.onstart = () => {
+        listeningRef.current = true;
         setListening(true);
         startingRef.current = false;
       };
 
       rec.onend = () => {
+        if (intentionalTeardownRef.current) return;
+
+        listeningRef.current = false;
         setListening(false);
         startingRef.current = false;
         recognitionRef.current = null;
@@ -134,11 +172,34 @@ export function useSpeechRecognition(options?: UseSpeechRecognitionOptions) {
         }
       };
 
-      rec.onerror = (ev) => {
+      rec.onerror = async (ev) => {
+        if (intentionalTeardownRef.current) return;
+
+        listeningRef.current = false;
         setListening(false);
         startingRef.current = false;
         recognitionRef.current = null;
         releaseWaitRef.current = micReleaseDelay(micReleaseDelayMs());
+
+        if (ev.error === "aborted") return;
+
+        const kiosk = isKioskHardware();
+        if (
+          ev.error === "audio-capture" &&
+          kiosk &&
+          captureAttempt < 3
+        ) {
+          await micReleaseDelay(
+            micCaptureRetryDelayMs(captureAttempt + 1),
+          );
+          void enqueueMicOp(() =>
+            runStart({
+              forceMicPreflight: false,
+              captureAttempt: captureAttempt + 1,
+            }),
+          );
+          return;
+        }
 
         const msg = mapSpeechRecognitionError(ev.error);
         if (msg) {
@@ -173,29 +234,53 @@ export function useSpeechRecognition(options?: UseSpeechRecognitionOptions) {
       try {
         rec.start();
       } catch (e) {
+        listeningRef.current = false;
         setListening(false);
         startingRef.current = false;
         recognitionRef.current = null;
         releaseWaitRef.current = micReleaseDelay(micReleaseDelayMs());
+
+        const kiosk = isKioskHardware();
+        if (kiosk && captureAttempt < 3) {
+          await micReleaseDelay(micCaptureRetryDelayMs(captureAttempt + 1));
+          void enqueueMicOp(() =>
+            runStart({
+              forceMicPreflight: false,
+              captureAttempt: captureAttempt + 1,
+            }),
+          );
+          return;
+        }
+
         setError(e instanceof Error ? e.message : "Could not start listening");
         setMicRecoverable(true);
       }
     },
-    [listening, releaseRecognition],
+    [teardownRecognition, waitForMicRelease],
+  );
+
+  const start = useCallback(
+    (opts?: { forceMicPreflight?: boolean }) =>
+      enqueueMicOp(() => runStart(opts)),
+    [runStart],
   );
 
   const retryMic = useCallback(() => {
     resetMicPreflight();
-    void start({ forceMicPreflight: true });
+    const force = !isKioskHardware();
+    void start({ forceMicPreflight: force });
   }, [start]);
 
   const releaseMic = useCallback(() => {
-    stop();
-    resetMicPreflight();
-    void releaseAudioForListening();
-    setError(null);
-    setMicRecoverable(false);
-  }, [stop]);
+    void enqueueMicOp(async () => {
+      stop();
+      resetMicPreflight();
+      await releaseAudioForListening();
+      await waitForMicRelease();
+      setError(null);
+      setMicRecoverable(false);
+    });
+  }, [stop, waitForMicRelease]);
 
   const reset = useCallback(() => {
     stop();
@@ -207,7 +292,13 @@ export function useSpeechRecognition(options?: UseSpeechRecognitionOptions) {
     setMicRecoverable(false);
   }, [stop]);
 
-  useEffect(() => () => recognitionRef.current?.abort(), []);
+  useEffect(
+    () => () => {
+      intentionalTeardownRef.current = true;
+      recognitionRef.current?.abort();
+    },
+    [],
+  );
 
   const displayText = `${transcript}${interim ? (transcript ? " " : "") + interim : ""}`.trim();
 

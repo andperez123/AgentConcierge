@@ -236,21 +236,19 @@ export default function TaskVoice() {
     })();
   };
 
+  const speechRef = useRef(speech);
+  speechRef.current = speech;
+
   useEffect(() => {
     saveVoiceMode(voiceMode);
     if (!voiceMode) {
-      speech.releaseMic();
+      speechRef.current.releaseMic();
       abortRef.current?.abort();
       setStatus("idle");
       return;
     }
-    const t = window.setTimeout(() => {
-      if (statusRef.current === "idle" && !speech.listening) {
-        startListening();
-      }
-    }, voiceListenGapMs());
-    return () => window.clearTimeout(t);
-  }, [voiceMode, speech, startListening]);
+    scheduleListenRef.current?.();
+  }, [voiceMode]);
 
   const draft = speech.transcript || manual;
 
