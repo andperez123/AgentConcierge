@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Plus } from "lucide-react";
 import type { Reminder } from "@concierge/shared";
 import {
@@ -8,7 +8,6 @@ import {
   fetchReminders,
 } from "../api";
 import ReminderComposer from "../components/ReminderComposer";
-import ReminderEditSheet from "../components/ReminderEditSheet";
 import {
   formatReminderDue,
   getReminderDueTone,
@@ -16,11 +15,14 @@ import {
   type ReminderFilter,
 } from "../utils/format";
 
-const FILTERS: Array<{ id: ReminderFilter; label: string }> = [
+type RemindersTab = ReminderFilter | "completed";
+
+const FILTERS: Array<{ id: RemindersTab; label: string }> = [
   { id: "overdue", label: "Overdue" },
   { id: "today", label: "Today" },
   { id: "upcoming", label: "Upcoming" },
   { id: "no-date", label: "No Date" },
+  { id: "completed", label: "Completed" },
 ];
 
 function defaultFilter(reminders: Reminder[]): ReminderFilter {
@@ -31,82 +33,91 @@ function defaultFilter(reminders: Reminder[]): ReminderFilter {
 }
 
 export default function RemindersPage() {
+  const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
+  const tabParam = params.get("tab");
   const highlightId = params.get("id");
 
+  const [filter, setFilter] = useState<RemindersTab>(
+    tabParam === "completed" ? "completed" : "today",
+  );
+  const [filterInitialized, setFilterInitialized] = useState(
+    tabParam === "completed",
+  );
   const [reminders, setReminders] = useState<Reminder[]>([]);
-  const [filter, setFilter] = useState<ReminderFilter>("today");
-  const [filterInitialized, setFilterInitialized] = useState(false);
   const [showComposer, setShowComposer] = useState(false);
-  const [editReminder, setEditReminder] = useState<Reminder | null>(null);
   const [dismissingId, setDismissingId] = useState<number | null>(null);
-
-  const rowRefs = useRef<Map<number, HTMLLIElement>>(new Map());
 
   const load = useCallback(async () => {
     try {
-      const data = await fetchReminders();
+      const data = await fetchReminders({
+        status: filter === "completed" ? "completed" : "active",
+      });
       setReminders(data);
-      if (!filterInitialized) {
+      if (!filterInitialized && filter !== "completed") {
         setFilter(defaultFilter(data));
         setFilterInitialized(true);
       }
     } catch {
       setReminders([]);
     }
-  }, [filterInitialized]);
+  }, [filter, filterInitialized]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  const filtered = useMemo(
-    () =>
-      reminders.filter(
-        (r) => getReminderFilterCategory(r.dueAt) === filter,
-      ),
-    [reminders, filter],
-  );
+  useEffect(() => {
+    if (tabParam === "completed") {
+      setFilter("completed");
+    }
+  }, [tabParam]);
+
+  useEffect(() => {
+    if (highlightId && /^\d+$/.test(highlightId)) {
+      navigate(`/reminders/${highlightId}`, { replace: true });
+    }
+  }, [highlightId, navigate]);
+
+  const filtered = useMemo(() => {
+    if (filter === "completed") return reminders;
+    return reminders.filter(
+      (r) => getReminderFilterCategory(r.dueAt) === filter,
+    );
+  }, [reminders, filter]);
 
   const counts = useMemo(() => {
-    const c: Record<ReminderFilter, number> = {
+    const c: Record<RemindersTab, number> = {
       overdue: 0,
       today: 0,
       upcoming: 0,
       "no-date": 0,
+      completed: 0,
     };
+    if (filter === "completed") {
+      c.completed = reminders.length;
+      return c;
+    }
     for (const r of reminders) {
       c[getReminderFilterCategory(r.dueAt)] += 1;
     }
     return c;
-  }, [reminders]);
+  }, [reminders, filter]);
 
-  useEffect(() => {
-    if (!highlightId || filtered.length === 0) return;
-    const id = Number(highlightId);
-    if (!Number.isFinite(id)) return;
-    const cat = reminders.find((r) => r.id === id);
-    if (cat) {
-      setFilter(getReminderFilterCategory(cat.dueAt));
+  function selectFilter(next: RemindersTab) {
+    setFilter(next);
+    if (next === "completed") {
+      setParams({ tab: "completed" });
+    } else {
+      setParams({});
     }
-    const t = window.setTimeout(() => {
-      const el = rowRefs.current.get(id);
-      el?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-      el?.classList.add("reminders-row--highlight");
-      window.setTimeout(() => el?.classList.remove("reminders-row--highlight"), 2000);
-    }, 100);
-    return () => window.clearTimeout(t);
-  }, [highlightId, filtered.length, reminders]);
+    setShowComposer(false);
+  }
 
   async function handleCreate(text: string, dueAt?: string) {
-    await createReminder({ text, dueAt, source: "dashboard" });
+    const created = await createReminder({ text, dueAt, source: "dashboard" });
     setShowComposer(false);
-    await load();
-    if (dueAt) {
-      setFilter(getReminderFilterCategory(dueAt));
-    } else {
-      setFilter("no-date");
-    }
+    navigate(`/reminders/${created.id}`);
   }
 
   async function handleDone(id: number, e: React.MouseEvent) {
@@ -115,9 +126,6 @@ export default function RemindersPage() {
     try {
       await dismissReminder(id);
       await load();
-      if (highlightId === String(id)) {
-        setParams({});
-      }
     } finally {
       setDismissingId(null);
     }
@@ -127,20 +135,23 @@ export default function RemindersPage() {
     <div className="app-kiosk reminders-page">
       <header className="reminders-page__header">
         <h1 className="reminders-page__title">Reminders</h1>
-        <button
-          type="button"
-          className="reminders-page__add"
-          aria-label="Add reminder"
-          onClick={() => {
-            setShowComposer(true);
-            setEditReminder(null);
-          }}
-        >
-          <Plus size={28} strokeWidth={2.5} />
-        </button>
+        {filter !== "completed" && (
+          <button
+            type="button"
+            className="reminders-page__add"
+            aria-label="Add reminder"
+            onClick={() => setShowComposer(true)}
+          >
+            <Plus size={28} strokeWidth={2.5} />
+          </button>
+        )}
       </header>
 
-      <div className="reminders-page__filters" role="tablist" aria-label="Filter reminders">
+      <div
+        className="reminders-page__filters reminders-page__filters--5"
+        role="tablist"
+        aria-label="Filter reminders"
+      >
         {FILTERS.map(({ id, label }) => (
           <button
             key={id}
@@ -148,7 +159,7 @@ export default function RemindersPage() {
             role="tab"
             aria-selected={filter === id}
             className={`reminders-filter${filter === id ? " reminders-filter--active" : ""}`}
-            onClick={() => setFilter(id)}
+            onClick={() => selectFilter(id)}
           >
             <span className="reminders-filter__label">{label}</span>
             {counts[id] > 0 && (
@@ -171,15 +182,17 @@ export default function RemindersPage() {
         {filtered.length === 0 ? (
           <div className="reminders-page__empty">
             <p className="reminders-page__empty-text">
-              {filter === "overdue"
-                ? "Nothing overdue"
-                : filter === "today"
-                  ? "Nothing due today"
-                  : filter === "upcoming"
-                    ? "Nothing upcoming"
-                    : "No reminders without a date"}
+              {filter === "completed"
+                ? "Nothing completed yet"
+                : filter === "overdue"
+                  ? "Nothing overdue"
+                  : filter === "today"
+                    ? "Nothing due today"
+                    : filter === "upcoming"
+                      ? "Nothing upcoming"
+                      : "No reminders without a date"}
             </p>
-            {!showComposer && (
+            {filter !== "completed" && !showComposer && (
               <button
                 type="button"
                 className="reminders-page__empty-cta action-card action-card--primary"
@@ -193,58 +206,47 @@ export default function RemindersPage() {
           <ul className="reminders-page__list">
             {filtered.map((r) => {
               const tone = getReminderDueTone(r.dueAt);
-              const dueLabel = formatReminderDue(r.dueAt);
+              const dueLabel =
+                filter === "completed" && r.dismissedAt
+                  ? `Completed ${new Date(r.dismissedAt).toLocaleDateString()}`
+                  : formatReminderDue(r.dueAt);
               return (
-                <li
-                  key={r.id}
-                  ref={(el) => {
-                    if (el) rowRefs.current.set(r.id, el);
-                    else rowRefs.current.delete(r.id);
-                  }}
-                  className="reminders-row"
-                >
+                <li key={r.id} className="reminders-row">
                   <button
                     type="button"
                     className="reminders-row__body"
-                    onClick={() => {
-                      setEditReminder(r);
-                      setShowComposer(false);
-                    }}
+                    onClick={() => navigate(`/reminders/${r.id}`)}
                   >
                     <span
-                      className={`reminders-row__dot reminders-row__dot--${tone}`}
+                      className={`reminders-row__dot reminders-row__dot--${filter === "completed" ? "none" : tone}`}
                       aria-hidden
                     />
                     <span className="reminders-row__content">
                       <span className="reminders-row__title">{r.text}</span>
                       <span
-                        className={`reminders-row__due reminders-row__due--${tone}`}
+                        className={`reminders-row__due reminders-row__due--${filter === "completed" ? "none" : tone}`}
                       >
                         {dueLabel}
                       </span>
                     </span>
                   </button>
-                  <button
-                    type="button"
-                    className="reminders-row__done"
-                    aria-label={`Done: ${r.text}`}
-                    disabled={dismissingId === r.id}
-                    onClick={(e) => void handleDone(r.id, e)}
-                  >
-                    {dismissingId === r.id ? "…" : "Done"}
-                  </button>
+                  {filter !== "completed" && (
+                    <button
+                      type="button"
+                      className="reminders-row__done"
+                      aria-label={`Done: ${r.text}`}
+                      disabled={dismissingId === r.id}
+                      onClick={(e) => void handleDone(r.id, e)}
+                    >
+                      {dismissingId === r.id ? "…" : "Done"}
+                    </button>
+                  )}
                 </li>
               );
             })}
           </ul>
         )}
       </div>
-
-      <ReminderEditSheet
-        reminder={editReminder}
-        onClose={() => setEditReminder(null)}
-        onSaved={() => void load()}
-      />
     </div>
   );
 }

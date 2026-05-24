@@ -8,7 +8,6 @@ import {
   fetchProjects,
   fetchReminders,
 } from "../api";
-import WorkItemSheet, { type WorkItem } from "../components/WorkItemSheet";
 import { formatReminderTime } from "../utils/format";
 import { formatProjectMeta } from "../utils/projectFormat";
 
@@ -22,7 +21,6 @@ export default function Work() {
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [notes, setNotes] = useState<Note[]>([]);
   const [projects, setProjects] = useState<OpenClawProject[]>([]);
-  const [selection, setSelection] = useState<WorkItem | null>(null);
   const [createKind, setCreateKind] = useState<"reminder" | "note" | null>(null);
   const [draft, setDraft] = useState("");
   const [dueAt, setDueAt] = useState("");
@@ -76,13 +74,15 @@ export default function Work() {
     const text = draft.trim();
     if (!text || !createKind) return;
     if (createKind === "reminder") {
-      await createReminder({
+      const created = await createReminder({
         text,
         dueAt: dueAt ? new Date(dueAt).toISOString() : undefined,
         source: "dashboard",
       });
+      navigate(`/reminders/${created.id}`);
     } else {
-      await createNote({ text, source: "dashboard" });
+      const created = await createNote({ text, source: "dashboard" });
+      navigate(`/notes/${created.id}`);
     }
     setDraft("");
     setDueAt("");
@@ -90,8 +90,12 @@ export default function Work() {
     await load();
   }
 
-  function openItem(item: WorkItem) {
-    setSelection(item);
+  function openItem(entry: { type: "reminder" | "note"; item: Reminder | Note }) {
+    if (entry.type === "reminder") {
+      navigate(`/reminders/${entry.item.id}`);
+    } else {
+      navigate(`/notes/${entry.item.id}`);
+    }
     setCreateKind(null);
   }
 
@@ -222,13 +226,7 @@ export default function Work() {
                   <button
                     type="button"
                     className="list-page-item"
-                    onClick={() =>
-                      openItem(
-                        entry.type === "reminder"
-                          ? { kind: "reminder", item: entry.item }
-                          : { kind: "note", item: entry.item },
-                      )
-                    }
+                    onClick={() => openItem(entry)}
                   >
                     {entry.type === "reminder" ? "⏰ " : "📝 "}
                     {entry.item.text}
@@ -244,14 +242,6 @@ export default function Work() {
           </ul>
         )}
       </div>
-
-      <WorkItemSheet
-        selection={selection}
-        projects={projects}
-        onClose={() => setSelection(null)}
-        onSaved={() => void load()}
-        enableActions
-      />
     </div>
   );
 }

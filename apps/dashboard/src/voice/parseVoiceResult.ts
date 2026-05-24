@@ -1,3 +1,5 @@
+import { isAllowedKioskRoute } from "@concierge/shared";
+
 const MARKER_START = "VOICE_RESULT_JSON:";
 const MARKER_END = "END_VOICE_RESULT_JSON";
 
@@ -21,22 +23,7 @@ export interface ParsedVoiceReply {
 }
 
 export function isAllowedVoiceRoute(route: string): boolean {
-  const trimmed = route.trim();
-  if (!trimmed.startsWith("/") || trimmed.includes("://")) return false;
-
-  try {
-    const url = new URL(trimmed, "http://local");
-    if (url.pathname === "/") return url.search === "";
-    if (url.pathname === "/work") {
-      return url.search === "" || url.search === "?tab=projects";
-    }
-    if (/^\/projects\/[a-z0-9-]+$/.test(url.pathname)) {
-      return url.search === "";
-    }
-    return false;
-  } catch {
-    return false;
-  }
+  return isAllowedKioskRoute(route);
 }
 
 function extractBetweenMarkers(reply: string): {

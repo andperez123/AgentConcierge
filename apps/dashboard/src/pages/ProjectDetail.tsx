@@ -1,34 +1,25 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import type { ProjectBreakdown, ProjectTask } from "@concierge/shared";
 import {
   fetchProjectBreakdown,
-  fetchProjects,
   postWorkEntityAction,
 } from "../api";
-import WorkItemSheet, { type WorkItem } from "../components/WorkItemSheet";
 import { formatReminderTime } from "../utils/format";
 import { ChevronLeft, Circle, CircleCheck } from "lucide-react";
 
 export default function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const [data, setData] = useState<ProjectBreakdown | null>(null);
-  const [projects, setProjects] = useState<
-    Awaited<ReturnType<typeof fetchProjects>>
-  >([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [selection, setSelection] = useState<WorkItem | null>(null);
 
   const load = useCallback(async () => {
     if (!id) return;
     try {
-      const [breakdown, projectList] = await Promise.all([
-        fetchProjectBreakdown(id),
-        fetchProjects(),
-      ]);
+      const breakdown = await fetchProjectBreakdown(id);
       setData(breakdown);
-      setProjects(projectList);
       setError(null);
     } catch (e) {
       setData(null);
@@ -207,9 +198,7 @@ export default function ProjectDetail() {
                     <button
                       type="button"
                       className="list-page-item"
-                      onClick={() =>
-                        setSelection({ kind: "reminder", item: r })
-                      }
+                      onClick={() => navigate(`/reminders/${r.id}`)}
                     >
                       ⏰ {r.text}
                       <span className="list-page-item__meta">
@@ -223,7 +212,7 @@ export default function ProjectDetail() {
                     <button
                       type="button"
                       className="list-page-item"
-                      onClick={() => setSelection({ kind: "note", item: n })}
+                      onClick={() => navigate(`/notes/${n.id}`)}
                     >
                       📝 {n.text}
                     </button>
@@ -262,13 +251,6 @@ export default function ProjectDetail() {
         </div>
       )}
 
-      <WorkItemSheet
-        selection={selection}
-        projects={projects}
-        onClose={() => setSelection(null)}
-        onSaved={() => void load()}
-        enableActions
-      />
     </div>
   );
 }

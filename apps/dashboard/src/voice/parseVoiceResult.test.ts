@@ -7,10 +7,16 @@ import {
 } from "./parseVoiceResult.js";
 
 describe("isAllowedVoiceRoute", () => {
-  it("allows home and work routes", () => {
+  it("allows home, work, desk, and project routes", () => {
     assert.equal(isAllowedVoiceRoute("/"), true);
     assert.equal(isAllowedVoiceRoute("/work"), true);
     assert.equal(isAllowedVoiceRoute("/work?tab=projects"), true);
+    assert.equal(isAllowedVoiceRoute("/work?tab=reminders"), true);
+    assert.equal(isAllowedVoiceRoute("/work?tab=notes"), true);
+    assert.equal(isAllowedVoiceRoute("/reminders"), true);
+    assert.equal(isAllowedVoiceRoute("/reminders/12"), true);
+    assert.equal(isAllowedVoiceRoute("/notes"), true);
+    assert.equal(isAllowedVoiceRoute("/notes/3"), true);
     assert.equal(isAllowedVoiceRoute("/projects/revenue-factory"), true);
   });
 

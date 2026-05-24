@@ -26,6 +26,7 @@ import {
   createNote,
   dismissNote,
   getNote,
+  listCompletedNotes,
   listNotes,
   updateNote,
 } from "./notes.js";
@@ -33,6 +34,7 @@ import {
   createReminder,
   dismissReminder,
   getReminder,
+  listCompletedReminders,
   listReminders,
   updateReminder,
 } from "./reminders.js";
@@ -415,7 +417,12 @@ router.get("/reminders", (req, res) => {
   const projectId = req.query.projectId
     ? String(req.query.projectId)
     : undefined;
-  res.json(listReminders(projectId));
+  const status = req.query.status === "completed" ? "completed" : "active";
+  res.json(
+    status === "completed"
+      ? listCompletedReminders(projectId)
+      : listReminders(projectId),
+  );
 });
 
 router.get("/reminders/:id", (req, res) => {
@@ -476,7 +483,12 @@ router.get("/notes", (req, res) => {
   const projectId = req.query.projectId
     ? String(req.query.projectId)
     : undefined;
-  res.json(listNotes(projectId));
+  const status = req.query.status === "completed" ? "completed" : "active";
+  res.json(
+    status === "completed"
+      ? listCompletedNotes(projectId)
+      : listNotes(projectId),
+  );
 });
 
 router.get("/notes/:id", (req, res) => {

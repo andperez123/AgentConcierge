@@ -28,7 +28,7 @@ export default function RemindersPanel({ reminders }: Props) {
                 <button
                   type="button"
                   className="reminder-item reminder-item--tappable"
-                  onClick={() => navigate(`/reminders?id=${r.id}`)}
+                  onClick={() => navigate(`/reminders/${r.id}`)}
                 >
                   <span
                     className={`reminder-item__dot reminder-item__dot--${i % 2 === 0 ? "accent" : "blue"}`}

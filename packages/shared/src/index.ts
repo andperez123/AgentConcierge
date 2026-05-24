@@ -172,6 +172,7 @@ export interface DashboardState {
     reminders: Reminder[];
     notes: Note[];
     projects: DashboardProjectWidget[];
+    deskSummary: DeskSummary;
   };
   integrations?: {
     google?: GoogleAuthStatus;
@@ -314,7 +315,53 @@ export interface Note {
   createdAt: string;
   source?: string;
   pinned?: boolean;
+  dismissedAt?: string;
   projectId?: string;
+}
+
+export type DeskListStatus = "active" | "completed";
+
+export interface DeskSummary {
+  activeReminders: number;
+  activeNotes: number;
+  completedReminders: number;
+  completedNotes: number;
+}
+
+export const KIOSK_DESK_ROUTES = {
+  reminders: "/reminders",
+  notes: "/notes",
+  work: "/work",
+  reminderDetail: (id: number) => `/reminders/${id}`,
+  noteDetail: (id: number) => `/notes/${id}`,
+} as const;
+
+export function isAllowedKioskRoute(route: string): boolean {
+  const trimmed = route.trim();
+  if (!trimmed.startsWith("/") || trimmed.includes("://")) return false;
+
+  try {
+    const url = new URL(trimmed, "http://local");
+    if (url.pathname === "/") return url.search === "";
+    if (url.pathname === "/reminders") return url.search === "";
+    if (/^\/reminders\/\d+$/.test(url.pathname)) return url.search === "";
+    if (url.pathname === "/notes") return url.search === "";
+    if (/^\/notes\/\d+$/.test(url.pathname)) return url.search === "";
+    if (url.pathname === "/work") {
+      return (
+        url.search === "" ||
+        url.search === "?tab=projects" ||
+        url.search === "?tab=reminders" ||
+        url.search === "?tab=notes"
+      );
+    }
+    if (/^\/projects\/[a-z0-9-]+$/.test(url.pathname)) {
+      return url.search === "";
+    }
+    return false;
+  } catch {
+    return false;
+  }
 }
 
 export interface CreateReminderBody {

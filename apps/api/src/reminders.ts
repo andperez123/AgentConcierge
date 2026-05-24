@@ -52,6 +52,38 @@ export function listReminders(projectId?: string): Reminder[] {
   return rows.map(rowToReminder);
 }
 
+export function listCompletedReminders(projectId?: string): Reminder[] {
+  const sql = projectId
+    ? `SELECT ${SELECT_COLS} FROM reminders
+       WHERE dismissed_at IS NOT NULL AND project_id = ?
+       ORDER BY dismissed_at DESC LIMIT 50`
+    : `SELECT ${SELECT_COLS} FROM reminders
+       WHERE dismissed_at IS NOT NULL
+       ORDER BY dismissed_at DESC LIMIT 50`;
+  const rows = (
+    projectId
+      ? db.prepare(sql).all(projectId)
+      : db.prepare(sql).all()
+  ) as ReminderRow[];
+  return rows.map(rowToReminder);
+}
+
+export function countActiveReminders(): number {
+  const row = db
+    .prepare(`SELECT COUNT(*) AS c FROM reminders WHERE dismissed_at IS NULL`)
+    .get() as { c: number };
+  return row.c;
+}
+
+export function countCompletedReminders(): number {
+  const row = db
+    .prepare(
+      `SELECT COUNT(*) AS c FROM reminders WHERE dismissed_at IS NOT NULL`,
+    )
+    .get() as { c: number };
+  return row.c;
+}
+
 export function getReminder(id: number): Reminder | null {
   const row = db
     .prepare(`SELECT ${SELECT_COLS} FROM reminders WHERE id = ?`)

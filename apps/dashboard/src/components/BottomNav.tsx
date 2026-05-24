@@ -30,7 +30,10 @@ export default function BottomNav({ state }: Props) {
         : path === "/work"
           ? pathname === "/work" ||
             pathname.startsWith("/projects/") ||
-            pathname === "/notes"
+            pathname === "/notes" ||
+            pathname.startsWith("/notes/") ||
+            pathname === "/reminders" ||
+            pathname.startsWith("/reminders/")
           : pathname === path || pathname.startsWith(`${path}/`);
     return `bottom-nav__item${active ? " bottom-nav__item--active" : ""}`;
   }

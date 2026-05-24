@@ -107,6 +107,9 @@ function migrateSchema(): void {
   if (!noteCols.some((c) => c.name === "project_id")) {
     db.exec(`ALTER TABLE notes ADD COLUMN project_id TEXT`);
   }
+  if (!noteCols.some((c) => c.name === "dismissed_at")) {
+    db.exec(`ALTER TABLE notes ADD COLUMN dismissed_at TEXT`);
+  }
 }
 
 migrateSchema();

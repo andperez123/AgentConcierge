@@ -34,7 +34,7 @@ Do **not** use reminders for critical failures — use **alerts** instead.
 curl -s http://127.0.0.1:3080/api/dashboard/state
 ```
 
-Returns `openclaw` health (`healthy`, `degraded`, `blocked`, `action_needed`, …), `alerts`, `actions`, `widgets` (weather, hero, reminders, notes).
+Returns `openclaw` health (`healthy`, `degraded`, `blocked`, `action_needed`, …), `alerts`, `actions`, `widgets` (weather, hero, reminders, notes, `deskSummary` counts).
 
 ## Hero card (center panel)
 
@@ -78,19 +78,23 @@ END_VOICE_RESULT_JSON
 ```
 
 - `spokenReply`: short text for TTS (required).
-- `actionsTaken`: e.g. `created_reminder`, `dismissed_note`, `listed_projects`.
-- `navigateTo`: null or one of `/`, `/work`, `/work?tab=projects`, `/projects/<slug>` (slug: `a-z0-9-`).
+- `actionsTaken`: e.g. `created_reminder`, `dismissed_note`, `updated_note`, `opened_reminder`, `completed_reminder`, `listed_completed`, `listed_projects`.
+- `navigateTo`: null or one of `/`, `/work`, `/work?tab=projects`, `/work?tab=reminders`, `/work?tab=notes`, `/reminders`, `/reminders/<id>`, `/notes`, `/notes/<id>`, `/projects/<slug>` (slug: `a-z0-9-`).
 - `pendingAction`: set when awaiting confirm for fuzzy dismiss, e.g. `{ "kind": "dismiss_reminder", "id": 4 }`.
 
 ### Voice command playbook
 
 | User says | Agent should |
 | --------- | -------------- |
-| "Remind me to …" | `POST /api/reminders` + toast; optional `navigateTo: "/work"` |
-| "Note: …" | `POST /api/notes` + toast |
+| "Remind me to …" | `POST /api/reminders` + toast; `navigateTo: "/reminders/<id>"` |
+| "Note: …" | `POST /api/notes` + toast; `navigateTo: "/notes/<id>"` |
+| "Open reminder 4" / "Show note 3" | `navigateTo: "/reminders/4"` or `"/notes/3"` + toast |
 | "Dismiss reminder 4" (exact id) | `DELETE /api/reminders/4` immediately |
 | "Dismiss the logs reminder" (fuzzy) | Do **not** delete; set `pendingAction`, ask user to say confirm |
-| "Delete note 3" | `DELETE /api/notes/3` |
+| "Delete note 3" / "Mark note 2 done" | `DELETE /api/notes/3` (soft dismiss — kept in history) |
+| "What did I complete?" | `GET /api/reminders?status=completed` and/or `GET /api/notes?status=completed`, summarize |
+| "Update reminder 4 to …" | `GET /api/reminders/4` then `PATCH` + `navigateTo: "/reminders/4"` |
+| "Edit note 3: …" | `PATCH /api/notes/3` + `navigateTo: "/notes/3"` |
 | "List projects" | `GET /api/projects`, summarize in `spokenReply` |
 | "Add reminder for revenue-factory: …" | `POST /api/reminders` with `projectId: "revenue-factory"` |
 
@@ -131,6 +135,10 @@ Types: `toast`, `navigate`, `focus-alert`, `confirm`, `highlight-action`.
 ## Reminders
 
 ```bash
+curl -s http://127.0.0.1:3080/api/reminders
+curl -s http://127.0.0.1:3080/api/reminders?status=completed
+curl -s http://127.0.0.1:3080/api/reminders/12
+
 curl -s -X POST http://127.0.0.1:3080/api/reminders \
   -H 'Content-Type: application/json' \
   -d '{"text":"Check gateway logs","dueAt":"2026-05-16T18:00:00Z","source":"openclaw","projectId":"revenue-factory"}'
@@ -138,11 +146,20 @@ curl -s -X POST http://127.0.0.1:3080/api/reminders \
 curl -s -X PATCH http://127.0.0.1:3080/api/reminders/12 \
   -H 'Content-Type: application/json' \
   -d '{"text":"Updated text","dueAt":null}'
+
+# Show on kiosk after create/edit
+curl -s -X POST http://127.0.0.1:3080/api/dashboard/commands \
+  -H 'Content-Type: application/json' \
+  -d '{"type":"navigate","route":"/reminders/12"}'
 ```
 
 ## Notes
 
 ```bash
+curl -s http://127.0.0.1:3080/api/notes
+curl -s http://127.0.0.1:3080/api/notes?status=completed
+curl -s http://127.0.0.1:3080/api/notes/3
+
 curl -s -X POST http://127.0.0.1:3080/api/notes \
   -H 'Content-Type: application/json' \
   -d '{"text":"API key rotation due Friday","pinned":true,"source":"openclaw"}'
@@ -150,6 +167,10 @@ curl -s -X POST http://127.0.0.1:3080/api/notes \
 curl -s -X PATCH http://127.0.0.1:3080/api/notes/3 \
   -H 'Content-Type: application/json' \
   -d '{"pinned":true}'
+
+curl -s -X POST http://127.0.0.1:3080/api/dashboard/commands \
+  -H 'Content-Type: application/json' \
+  -d '{"type":"navigate","route":"/notes/3"}'
 ```
 
 ## Projects

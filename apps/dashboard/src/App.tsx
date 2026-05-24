@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Route, Routes } from "react-router-dom";
 import { useEffect } from "react";
 import { reportScreen } from "./api";
 import { useDensity } from "./hooks/useDensity";
@@ -14,6 +14,9 @@ import TaskRecovery from "./pages/TaskRecovery";
 import TaskVoice from "./pages/TaskVoice";
 import Work from "./pages/Work";
 import RemindersPage from "./pages/RemindersPage";
+import ReminderDetailPage from "./pages/ReminderDetailPage";
+import NotesPage from "./pages/NotesPage";
+import NoteDetailPage from "./pages/NoteDetailPage";
 import ProjectDetail from "./pages/ProjectDetail";
 
 export default function App() {
@@ -36,8 +39,10 @@ export default function App() {
         <Route path="/debug" element={<Debug />} />
         <Route path="/work" element={<Work />} />
         <Route path="/projects/:id" element={<ProjectDetail />} />
-        <Route path="/notes" element={<Navigate to="/work?tab=notes" replace />} />
+        <Route path="/notes" element={<NotesPage />} />
+        <Route path="/notes/:id" element={<NoteDetailPage />} />
         <Route path="/reminders" element={<RemindersPage />} />
+        <Route path="/reminders/:id" element={<ReminderDetailPage />} />
         <Route path="/incident/:alertId" element={<Incident />} />
         <Route path="/task/reauth" element={<TaskReauth />} />
         <Route path="/task/recovery" element={<TaskRecovery />} />

@@ -225,9 +225,22 @@ export async function saveSettings(opts: {
   return data;
 }
 
-export async function fetchReminders(): Promise<Reminder[]> {
-  const res = await fetch(`${API}/reminders`);
+export async function fetchReminders(options?: {
+  status?: "active" | "completed";
+  projectId?: string;
+}): Promise<Reminder[]> {
+  const params = new URLSearchParams();
+  if (options?.status === "completed") params.set("status", "completed");
+  if (options?.projectId) params.set("projectId", options.projectId);
+  const qs = params.toString();
+  const res = await fetch(`${API}/reminders${qs ? `?${qs}` : ""}`);
   if (!res.ok) throw new Error("Reminders fetch failed");
+  return res.json();
+}
+
+export async function fetchReminder(id: number): Promise<Reminder> {
+  const res = await fetch(`${API}/reminders/${id}`);
+  if (!res.ok) throw new Error("Reminder fetch failed");
   return res.json();
 }
 
@@ -247,9 +260,22 @@ export async function createReminder(
   return res.json();
 }
 
-export async function fetchNotes(): Promise<Note[]> {
-  const res = await fetch(`${API}/notes`);
+export async function fetchNotes(options?: {
+  status?: "active" | "completed";
+  projectId?: string;
+}): Promise<Note[]> {
+  const params = new URLSearchParams();
+  if (options?.status === "completed") params.set("status", "completed");
+  if (options?.projectId) params.set("projectId", options.projectId);
+  const qs = params.toString();
+  const res = await fetch(`${API}/notes${qs ? `?${qs}` : ""}`);
   if (!res.ok) throw new Error("Notes fetch failed");
+  return res.json();
+}
+
+export async function fetchNote(id: number): Promise<Note> {
+  const res = await fetch(`${API}/notes/${id}`);
+  if (!res.ok) throw new Error("Note fetch failed");
   return res.json();
 }
 

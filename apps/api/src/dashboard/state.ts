@@ -6,8 +6,8 @@ import { buildDashboardActions } from "./actions.js";
 import { mapToSystemHealth } from "../openclaw/health.js";
 import { getOpenClawStatus } from "../openclaw/adapter.js";
 import { getWeather } from "../weather/service.js";
-import { listReminders } from "../reminders.js";
-import { listNotes } from "../notes.js";
+import { listReminders, countActiveReminders, countCompletedReminders } from "../reminders.js";
+import { listNotes, countActiveNotes, countCompletedNotes } from "../notes.js";
 import { listProjects } from "../openclaw/projects.js";
 import { getGoogleAuthStatus } from "../openclaw/google.js";
 import { getHeroDisplay } from "../display/hero.js";
@@ -153,6 +153,12 @@ export async function buildDashboardState(force = false): Promise<DashboardState
         nextFocus: p.nextFocus,
         taskProgress: p.taskProgress,
       })),
+      deskSummary: {
+        activeReminders: countActiveReminders(),
+        activeNotes: countActiveNotes(),
+        completedReminders: countCompletedReminders(),
+        completedNotes: countCompletedNotes(),
+      },
     },
     device,
     api: { ok: true, version: VERSION, mock: MOCK_OPENCLAW },
