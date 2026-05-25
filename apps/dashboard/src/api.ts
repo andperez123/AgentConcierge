@@ -20,6 +20,7 @@ import type {
   Operation,
   OperationResponse,
   ProjectBreakdown,
+  ProjectExportResponse,
   Reminder,
   RestartEvent,
   SettingsSaveResponse,
@@ -353,6 +354,20 @@ export async function fetchProjectBreakdown(
   const res = await fetch(`${API}/projects/${encodeURIComponent(id)}`);
   if (!res.ok) throw new Error("Project not found");
   return res.json();
+}
+
+export async function exportProjectContext(
+  id: string,
+): Promise<ProjectExportResponse> {
+  const res = await fetch(
+    `${API}/projects/${encodeURIComponent(id)}/export`,
+    { method: "POST" },
+  );
+  const body = (await res.json()) as ProjectExportResponse;
+  if (!res.ok) {
+    throw new Error(body.message ?? "Export failed");
+  }
+  return body;
 }
 
 export async function postWorkEntityAction(

@@ -2586,6 +2586,33 @@ button {
   margin: 0;
 }
 
+.project-detail__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.project-detail__action {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.project-detail__action--secondary {
+  flex: 0 1 auto;
+}
+
+.project-detail__export-feedback {
+  margin: 6px 0 0;
+  font-size: var(--text-caption);
+  color: var(--muted);
+  word-break: break-all;
+}
+
 .project-detail__agent {
   width: 100%;
 }

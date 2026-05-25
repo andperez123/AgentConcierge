@@ -1,12 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import type { ProjectBreakdown, ProjectTask } from "@concierge/shared";
 import {
+  formatProjectBreakdownMarkdown,
+  type ProjectBreakdown,
+  type ProjectTask,
+} from "@concierge/shared";
+import {
+  exportProjectContext,
   fetchProjectBreakdown,
   postWorkEntityAction,
 } from "../api";
 import { formatReminderTime } from "../utils/format";
-import { ChevronLeft, Circle, CircleCheck } from "lucide-react";
+import { ChevronLeft, Circle, CircleCheck, Copy, FileDown } from "lucide-react";
 
 export default function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
@@ -14,6 +19,9 @@ export default function ProjectDetail() {
   const [data, setData] = useState<ProjectBreakdown | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [exportBusy, setExportBusy] = useState(false);
+  const [exportFeedback, setExportFeedback] = useState<string | null>(null);
+  const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -49,6 +57,38 @@ export default function ProjectDetail() {
       await postWorkEntityAction("project", id, { action: "ask-agent" });
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function exportToFile() {
+    if (!id) return;
+    setExportBusy(true);
+    setExportFeedback(null);
+    try {
+      const result = await exportProjectContext(id);
+      const label = result.filename ?? "exported";
+      setExportFeedback(`Saved ${label}`);
+    } catch (e) {
+      setExportFeedback(
+        e instanceof Error ? e.message : "Export failed",
+      );
+    } finally {
+      setExportBusy(false);
+      window.setTimeout(() => setExportFeedback(null), 4000);
+    }
+  }
+
+  async function copyContext() {
+    if (!data) return;
+    try {
+      await navigator.clipboard.writeText(
+        formatProjectBreakdownMarkdown(data),
+      );
+      setCopyFeedback("Copied");
+    } catch {
+      setCopyFeedback("Copy failed");
+    } finally {
+      window.setTimeout(() => setCopyFeedback(null), 2000);
     }
   }
 
@@ -106,14 +146,37 @@ export default function ProjectDetail() {
                 Updated {data.project.updatedAt.slice(0, 10)}
               </p>
             )}
-            <button
-              type="button"
-              className="dash-card__footer-btn project-detail__agent"
-              disabled={busy}
-              onClick={() => void askAgent()}
-            >
-              {busy ? "Sending…" : "Ask agent about this project"}
-            </button>
+            <div className="project-detail__actions">
+              <button
+                type="button"
+                className="dash-card__footer-btn project-detail__action"
+                disabled={exportBusy || !data}
+                onClick={() => void exportToFile()}
+              >
+                <FileDown size={18} aria-hidden />
+                {exportBusy ? "Exporting…" : "Export to file"}
+              </button>
+              <button
+                type="button"
+                className="dash-card__footer-btn project-detail__action project-detail__action--secondary"
+                disabled={!data}
+                onClick={() => void copyContext()}
+              >
+                <Copy size={18} aria-hidden />
+                {copyFeedback ?? "Copy context"}
+              </button>
+              <button
+                type="button"
+                className="dash-card__footer-btn project-detail__action"
+                disabled={busy}
+                onClick={() => void askAgent()}
+              >
+                {busy ? "Sending…" : "Ask agent"}
+              </button>
+            </div>
+            {exportFeedback && (
+              <p className="project-detail__export-feedback">{exportFeedback}</p>
+            )}
           </>
         )}
       </header>

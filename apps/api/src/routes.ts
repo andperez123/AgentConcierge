@@ -44,6 +44,7 @@ import {
   listProjects,
   syncProject,
 } from "./openclaw/projects.js";
+import { exportProjectContextToFile } from "./openclaw/projectExport.js";
 import { getGoogleAuthStatus } from "./openclaw/google.js";
 import { queueWorkEntityAction } from "./work/actions.js";
 import type { SyncProjectBody, WorkEntityActionBody, WorkEntityKind } from "@concierge/shared";
@@ -399,6 +400,16 @@ router.get("/projects/:id", (req, res) => {
     return;
   }
   res.json(breakdown);
+});
+
+router.post("/projects/:id/export", (req, res) => {
+  const result = exportProjectContextToFile(req.params.id);
+  if (!result.ok) {
+    const status = result.message === "Project not found" ? 404 : 500;
+    res.status(status).json(result);
+    return;
+  }
+  res.json(result);
 });
 
 router.post("/projects/sync", (req, res) => {

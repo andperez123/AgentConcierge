@@ -22,6 +22,7 @@ Concierge API base: `http://127.0.0.1:3080/api`
 | Full desk snapshot | `GET /api/dashboard/state` |
 | List OpenClaw projects (`~/clawd/projects/`) | `GET /api/projects` |
 | Project breakdown | `GET /api/projects/:id` |
+| Export project context to disk (Markdown) | `POST /api/projects/:id/export` → `~/clawd/exports/<id>-context.md` |
 | Agent action on reminder/note/project | `POST /api/work/:kind/:id/actions` |
 | Google auth status (display) | `GET /api/openclaw/google/status` |
 | Google reauth (Pi / Drive) | `POST /api/openclaw/google/reauth` |
@@ -213,6 +214,9 @@ Example `TASKS.md`:
 ```bash
 curl -s http://127.0.0.1:3080/api/projects
 curl -s http://127.0.0.1:3080/api/projects/revenue-factory
+
+# Export full context to ~/clawd/exports/ (sync folder to Mac via Drive/rsync)
+curl -s -X POST http://127.0.0.1:3080/api/projects/revenue-factory/export
 
 # Optional cache when folder not on disk yet
 curl -s -X POST http://127.0.0.1:3080/api/projects/sync \

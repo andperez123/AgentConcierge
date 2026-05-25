@@ -12,6 +12,8 @@ export const OPENCLAW_CLAWD_DIR =
   process.env.OPENCLAW_CLAWD_DIR ?? join(home, "clawd");
 export const OPENCLAW_PROJECTS_DIR =
   process.env.OPENCLAW_PROJECTS_DIR ?? join(OPENCLAW_CLAWD_DIR, "projects");
+export const OPENCLAW_EXPORT_DIR =
+  process.env.OPENCLAW_EXPORT_DIR ?? join(OPENCLAW_CLAWD_DIR, "exports");
 
 export const PORT = Number(process.env.PORT ?? 3080);
 /** Only for local dev without the openclaw CLI. Never used in production. */

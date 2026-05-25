@@ -466,3 +466,12 @@ export interface WorkEntityActionBody {
   action: WorkEntityActionId;
   options?: { folder?: string; prompt?: string };
 }
+
+export interface ProjectExportResponse {
+  ok: boolean;
+  path?: string;
+  filename?: string;
+  message?: string;
+}
+
+export { formatProjectBreakdownMarkdown } from "./formatProjectMarkdown.js";

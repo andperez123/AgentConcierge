@@ -186,6 +186,23 @@ sudo systemctl start concierge-kiosk
 
 Chromium opens fullscreen to the dashboard on the 7" display.
 
+### Export project context to your Mac
+
+On the Pi kiosk, open **Work → Projects →** a project and tap **Export to file**. Concierge writes a Markdown bundle to `~/clawd/exports/<project-id>-context.md` (overview, tasks, linked desk items, doc index). Re-exporting overwrites the same filename.
+
+Sync that folder to your Mac:
+
+- **Google Drive Desktop** — add `~/clawd/exports` (or all of `~/clawd`) as a synced folder on the Pi.
+- **rsync** from your Mac (replace user and IP):
+
+```bash
+rsync -avz aperez@10.0.0.75:~/clawd/exports/ ~/Projects/clawd-exports/
+```
+
+Open the synced `.md` in Cursor or paste into chat. This does **not** require Google auth on Concierge (unlike **Save to Drive** on desk items, which goes through the OpenClaw agent).
+
+Optional env: `OPENCLAW_EXPORT_DIR` (default `~/clawd/exports`).
+
 ### 5. Troubleshooting
 
 | Symptom | Check |
