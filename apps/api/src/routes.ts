@@ -429,10 +429,16 @@ router.get("/reminders", (req, res) => {
     ? String(req.query.projectId)
     : undefined;
   const status = req.query.status === "completed" ? "completed" : "active";
+  const mode =
+    req.query.context === "life"
+      ? "life"
+      : req.query.context === "work"
+        ? "work"
+        : undefined;
   res.json(
     status === "completed"
-      ? listCompletedReminders(projectId)
-      : listReminders(projectId),
+      ? listCompletedReminders(projectId, mode)
+      : listReminders(projectId, mode),
   );
 });
 
@@ -495,10 +501,16 @@ router.get("/notes", (req, res) => {
     ? String(req.query.projectId)
     : undefined;
   const status = req.query.status === "completed" ? "completed" : "active";
+  const mode =
+    req.query.context === "life"
+      ? "life"
+      : req.query.context === "work"
+        ? "work"
+        : undefined;
   res.json(
     status === "completed"
-      ? listCompletedNotes(projectId)
-      : listNotes(projectId),
+      ? listCompletedNotes(projectId, mode)
+      : listNotes(projectId, mode),
   );
 });
 

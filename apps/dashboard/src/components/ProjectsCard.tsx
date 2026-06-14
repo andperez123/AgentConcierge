@@ -9,7 +9,7 @@ interface Props {
 
 export default function ProjectsCard({ projects }: Props) {
   const navigate = useNavigate();
-  const shown = projects.slice(0, 4);
+  const shown = projects.slice(0, 8);
 
   return (
     <article className="dash-card projects-card">

@@ -1,27 +1,23 @@
 import { Link, useLocation } from "react-router-dom";
 import {
   Home,
-  Bot,
+  Calendar,
   Briefcase,
   Mic,
   Settings,
 } from "lucide-react";
 import type { DashboardState } from "@concierge/shared";
+import { useAppPrefs } from "../context/AppPrefsContext";
 
 interface Props {
   state: DashboardState | null;
 }
 
-function showOpenClawBadge(state: DashboardState | null): boolean {
-  if (!state) return false;
-  if (state.alerts.length > 0) return true;
-  const s = state.openclaw.state;
-  return s === "action_needed" || s === "blocked";
-}
-
-export default function BottomNav({ state }: Props) {
+export default function BottomNav({ state: _state }: Props) {
   const { pathname } = useLocation();
-  const badge = showOpenClawBadge(state);
+  const { mode } = useAppPrefs();
+  const deskLabel = mode === "work" ? "Work" : "Life";
+  const goalsLabel = mode === "work" ? "Goals" : "Reminders";
 
   function navClass(path: string): string {
     const active =
@@ -44,17 +40,16 @@ export default function BottomNav({ state }: Props) {
         <Home strokeWidth={2} />
         <span>Home</span>
       </Link>
-      <Link to="/openclaw" className={navClass("/openclaw")}>
-        <Bot strokeWidth={2} />
-        <span>OpenClaw</span>
-        {badge && <span className="bottom-nav__badge" aria-hidden />}
+      <Link to="/reminders" className={navClass("/reminders")}>
+        <Calendar strokeWidth={2} />
+        <span>{goalsLabel}</span>
       </Link>
       <Link to="/task/voice" className="bottom-nav__fab" aria-label="Voice">
         <Mic strokeWidth={2} size={28} />
       </Link>
       <Link to="/work" className={navClass("/work")}>
         <Briefcase strokeWidth={2} />
-        <span>Work</span>
+        <span>{deskLabel}</span>
       </Link>
       <Link to="/settings" className={navClass("/settings")}>
         <Settings strokeWidth={2} />

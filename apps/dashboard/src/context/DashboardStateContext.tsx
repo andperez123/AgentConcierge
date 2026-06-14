@@ -9,6 +9,7 @@ import {
 } from "react";
 import type { DashboardCommand, DashboardState } from "@concierge/shared";
 import { fetchDashboardState } from "../api";
+import { useAppPrefs } from "./AppPrefsContext";
 
 const POLL_MS = 5000;
 const POLL_FALLBACK_MS = 30000;
@@ -30,14 +31,20 @@ const DashboardStateContext = createContext<DashboardStateContextValue | null>(
 );
 
 export function DashboardStateProvider({ children }: { children: ReactNode }) {
+  const { mode } = useAppPrefs();
   const [state, setState] = useState<DashboardState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [sseConnected, setSseConnected] = useState(false);
   const commandListeners = useRef(new Set<CommandListener>());
+  const modeRef = useRef(mode);
+
+  useEffect(() => {
+    modeRef.current = mode;
+  }, [mode]);
 
   const refresh = useCallback(async (force = false) => {
     try {
-      const data = await fetchDashboardState(force);
+      const data = await fetchDashboardState(force, modeRef.current);
       setState(data);
       setError(null);
     } catch (e) {
@@ -51,6 +58,10 @@ export function DashboardStateProvider({ children }: { children: ReactNode }) {
       commandListeners.current.delete(listener);
     };
   }, []);
+
+  useEffect(() => {
+    void refresh(true);
+  }, [mode, refresh]);
 
   useEffect(() => {
     let es: EventSource | null = null;

@@ -1,24 +1,29 @@
 import { Link, useNavigate } from "react-router-dom";
 import { Calendar, ChevronRight } from "lucide-react";
 import type { Reminder } from "@concierge/shared";
+import type { AppMode } from "../context/AppPrefsContext";
 import { formatReminderDue } from "../utils/format";
 
 interface Props {
   reminders: Reminder[];
+  mode?: AppMode;
 }
 
-export default function RemindersPanel({ reminders }: Props) {
+export default function RemindersPanel({ reminders, mode = "work" }: Props) {
   const navigate = useNavigate();
-  const shown = reminders.slice(0, 4);
+  const shown = reminders.slice(0, 8);
+  const title = mode === "work" ? "Goals" : "Reminders";
+  const empty = mode === "work" ? "No work goals" : "No reminders";
+  const footer = mode === "work" ? "All goals" : "All reminders";
 
   return (
     <article className="dash-card">
       <header className="dash-card__header">
         <Calendar size={18} />
-        <span>Reminders</span>
+        <span>{title}</span>
       </header>
       {shown.length === 0 ? (
-        <p className="reminder-empty">No reminders</p>
+        <p className="reminder-empty">{empty}</p>
       ) : (
         <ul className="reminder-list">
           {shown.map((r, i) => {
@@ -45,7 +50,7 @@ export default function RemindersPanel({ reminders }: Props) {
       )}
       <footer className="dash-card__footer">
         <Link to="/reminders" className="dash-card__footer-btn">
-          All reminders
+          {footer}
           <ChevronRight size={16} />
         </Link>
       </footer>

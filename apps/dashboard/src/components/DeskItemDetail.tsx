@@ -5,6 +5,7 @@ import type {
   Note,
   OpenClawProject,
   Reminder,
+  WorkContext,
   WorkEntityActionId,
 } from "@concierge/shared";
 import {
@@ -15,6 +16,8 @@ import {
   updateNote,
   updateReminder,
 } from "../api";
+import AgentQuickActions from "./AgentQuickActions";
+import ContextPicker from "./ContextPicker";
 import DueTimePicker from "./DueTimePicker";
 import { formatReminderDue, getReminderDueTone } from "../utils/format";
 
@@ -42,6 +45,9 @@ export default function DeskItemDetail(props: Props) {
     kind === "note" ? Boolean(item.pinned) : false,
   );
   const [projectId, setProjectId] = useState(item.projectId ?? "");
+  const [itemContext, setItemContext] = useState<WorkContext>(
+    item.context ?? null,
+  );
   const [projects, setProjects] = useState<OpenClawProject[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -53,6 +59,7 @@ export default function DeskItemDetail(props: Props) {
     setDueAt(kind === "reminder" ? item.dueAt : undefined);
     setPinned(kind === "note" ? Boolean(item.pinned) : false);
     setProjectId(item.projectId ?? "");
+    setItemContext(item.context ?? null);
     setError(null);
   }, [item, kind]);
 
@@ -86,12 +93,14 @@ export default function DeskItemDetail(props: Props) {
           text: trimmed,
           dueAt: dueAt ?? null,
           projectId: projects.length > 0 ? projectId || null : undefined,
+          context: itemContext,
         });
       } else {
         await updateNote(item.id, {
           text: trimmed,
           pinned,
           projectId: projects.length > 0 ? projectId || null : undefined,
+          context: itemContext,
         });
       }
       setSavedFeedback(true);
@@ -258,7 +267,27 @@ export default function DeskItemDetail(props: Props) {
             </select>
           </label>
         )}
+
+        {!completed && (
+          <label className="desk-detail__field">
+            <span>Context</span>
+            <ContextPicker
+              value={itemContext}
+              onChange={setItemContext}
+              disabled={busy}
+            />
+          </label>
+        )}
       </div>
+
+      {!completed && itemContext === "work" && (
+        <AgentQuickActions
+          kind={kind}
+          id={String(item.id)}
+          context={itemContext}
+          onComplete={onChanged}
+        />
+      )}
 
       {error && <p className="desk-detail__error">{error}</p>}
       {savedFeedback && (

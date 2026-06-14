@@ -2,6 +2,7 @@ import type {
   CreateReminderBody,
   Reminder,
   UpdateReminderBody,
+  WorkContext,
 } from "@concierge/shared";
 import { db } from "./db.js";
 import { emitDashboardEvent } from "./dashboard/events.js";
@@ -14,9 +15,15 @@ type ReminderRow = {
   source: string | null;
   dismissed_at: string | null;
   project_id: string | null;
+  context: string | null;
 };
 
-const SELECT_COLS = `id, text, due_at, created_at, source, dismissed_at, project_id`;
+const SELECT_COLS = `id, text, due_at, created_at, source, dismissed_at, project_id, context`;
+
+function parseContext(value: string | null): WorkContext {
+  if (value === "work" || value === "life") return value;
+  return null;
+}
 
 function rowToReminder(row: ReminderRow): Reminder {
   return {
@@ -27,6 +34,7 @@ function rowToReminder(row: ReminderRow): Reminder {
     source: row.source ?? undefined,
     dismissedAt: row.dismissed_at ?? undefined,
     projectId: row.project_id ?? undefined,
+    context: parseContext(row.context),
   };
 }
 
@@ -34,36 +42,54 @@ function notifyState(): void {
   emitDashboardEvent("state-changed", {});
 }
 
-export function listReminders(projectId?: string): Reminder[] {
+function contextClause(mode?: "work" | "life"): { sql: string; params: string[] } {
+  if (mode === "work") {
+    return { sql: ` AND (context = 'work' OR context IS NULL)`, params: [] };
+  }
+  if (mode === "life") {
+    return { sql: ` AND (context = 'life' OR context IS NULL)`, params: [] };
+  }
+  return { sql: "", params: [] };
+}
+
+export function listReminders(
+  projectId?: string,
+  mode?: "work" | "life",
+): Reminder[] {
+  const ctx = contextClause(mode);
   const sql = projectId
     ? `SELECT ${SELECT_COLS} FROM reminders
-       WHERE dismissed_at IS NULL AND project_id = ?
+       WHERE dismissed_at IS NULL AND project_id = ?${ctx.sql}
        ORDER BY CASE WHEN due_at IS NULL THEN 1 ELSE 0 END, due_at ASC, created_at DESC
        LIMIT 20`
     : `SELECT ${SELECT_COLS} FROM reminders
-       WHERE dismissed_at IS NULL
+       WHERE dismissed_at IS NULL${ctx.sql}
        ORDER BY CASE WHEN due_at IS NULL THEN 1 ELSE 0 END, due_at ASC, created_at DESC
        LIMIT 20`;
   const rows = (
     projectId
-      ? db.prepare(sql).all(projectId)
-      : db.prepare(sql).all()
+      ? db.prepare(sql).all(projectId, ...ctx.params)
+      : db.prepare(sql).all(...ctx.params)
   ) as ReminderRow[];
   return rows.map(rowToReminder);
 }
 
-export function listCompletedReminders(projectId?: string): Reminder[] {
+export function listCompletedReminders(
+  projectId?: string,
+  mode?: "work" | "life",
+): Reminder[] {
+  const ctx = contextClause(mode);
   const sql = projectId
     ? `SELECT ${SELECT_COLS} FROM reminders
-       WHERE dismissed_at IS NOT NULL AND project_id = ?
+       WHERE dismissed_at IS NOT NULL AND project_id = ?${ctx.sql}
        ORDER BY dismissed_at DESC LIMIT 50`
     : `SELECT ${SELECT_COLS} FROM reminders
-       WHERE dismissed_at IS NOT NULL
+       WHERE dismissed_at IS NOT NULL${ctx.sql}
        ORDER BY dismissed_at DESC LIMIT 50`;
   const rows = (
     projectId
-      ? db.prepare(sql).all(projectId)
-      : db.prepare(sql).all()
+      ? db.prepare(sql).all(projectId, ...ctx.params)
+      : db.prepare(sql).all(...ctx.params)
   ) as ReminderRow[];
   return rows.map(rowToReminder);
 }
@@ -95,10 +121,12 @@ export function createReminder(body: CreateReminderBody): Reminder {
   const text = body.text.trim();
   if (!text) throw new Error("Reminder text is required");
   const now = new Date().toISOString();
+  const context =
+    body.context === "work" || body.context === "life" ? body.context : null;
   const result = db
     .prepare(
-      `INSERT INTO reminders (text, due_at, created_at, source, project_id)
-       VALUES (?, ?, ?, ?, ?)`,
+      `INSERT INTO reminders (text, due_at, created_at, source, project_id, context)
+       VALUES (?, ?, ?, ?, ?, ?)`,
     )
     .run(
       text,
@@ -106,6 +134,7 @@ export function createReminder(body: CreateReminderBody): Reminder {
       now,
       body.source ?? "dashboard",
       body.projectId ?? null,
+      context,
     );
   const row = db
     .prepare(`SELECT ${SELECT_COLS} FROM reminders WHERE id = ?`)
@@ -140,9 +169,16 @@ export function updateReminder(
         ? body.projectId
         : (existing.projectId ?? null);
 
+  const context =
+    body.context !== undefined
+      ? body.context === "work" || body.context === "life"
+        ? body.context
+        : null
+      : (existing.context ?? null);
+
   db.prepare(
-    `UPDATE reminders SET text = ?, due_at = ?, project_id = ? WHERE id = ?`,
-  ).run(text, dueAt, projectId, id);
+    `UPDATE reminders SET text = ?, due_at = ?, project_id = ?, context = ? WHERE id = ?`,
+  ).run(text, dueAt, projectId, context, id);
 
   const updated = getReminder(id);
   if (updated) notifyState();

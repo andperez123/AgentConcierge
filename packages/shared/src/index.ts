@@ -229,6 +229,9 @@ export interface ActionResponse {
 
 export type TempUnit = "fahrenheit" | "celsius";
 
+/** Tri-state work/life tagging. null = visible in both modes. */
+export type WorkContext = "work" | "life" | null;
+
 export interface GeocodeResult {
   name: string;
   latitude: number;
@@ -307,6 +310,7 @@ export interface Reminder {
   source?: string;
   dismissedAt?: string;
   projectId?: string;
+  context?: WorkContext;
 }
 
 export interface Note {
@@ -317,6 +321,7 @@ export interface Note {
   pinned?: boolean;
   dismissedAt?: string;
   projectId?: string;
+  context?: WorkContext;
 }
 
 export type DeskListStatus = "active" | "completed";
@@ -369,6 +374,7 @@ export interface CreateReminderBody {
   dueAt?: string;
   source?: string;
   projectId?: string;
+  context?: WorkContext;
 }
 
 export interface CreateNoteBody {
@@ -376,18 +382,21 @@ export interface CreateNoteBody {
   source?: string;
   pinned?: boolean;
   projectId?: string;
+  context?: WorkContext;
 }
 
 export interface UpdateReminderBody {
   text?: string;
   dueAt?: string | null;
   projectId?: string | null;
+  context?: WorkContext;
 }
 
 export interface UpdateNoteBody {
   text?: string;
   pinned?: boolean;
   projectId?: string | null;
+  context?: WorkContext;
 }
 
 export interface OpenClawProject {

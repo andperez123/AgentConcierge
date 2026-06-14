@@ -8,6 +8,20 @@
     />
     <meta name="concierge-kiosk" content="1" />
     <title>Concierge</title>
+    <script>
+      (function () {
+        var root = document.documentElement;
+        try {
+          var theme = localStorage.getItem("concierge-theme");
+          var mode = localStorage.getItem("concierge-mode");
+          root.dataset.theme = theme === "light" || theme === "dark" ? theme : "dark";
+          root.dataset.mode = mode === "work" || mode === "life" ? mode : "work";
+        } catch (e) {
+          root.dataset.theme = "dark";
+          root.dataset.mode = "work";
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

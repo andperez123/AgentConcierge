@@ -43,9 +43,14 @@ export async function fetchHealth(): Promise<HealthResponse> {
 
 export async function fetchDashboardState(
   force = false,
+  mode?: "work" | "life",
 ): Promise<DashboardState> {
+  const params = new URLSearchParams();
+  if (force) params.set("force", "1");
+  if (mode) params.set("mode", mode);
+  const qs = params.toString();
   const res = await fetch(
-    `${API}/dashboard/state${force ? "?force=1" : ""}`,
+    `${API}/dashboard/state${qs ? `?${qs}` : ""}`,
   );
   if (!res.ok) throw new Error("Dashboard state fetch failed");
   return res.json();
@@ -229,10 +234,12 @@ export async function saveSettings(opts: {
 export async function fetchReminders(options?: {
   status?: "active" | "completed";
   projectId?: string;
+  context?: "work" | "life";
 }): Promise<Reminder[]> {
   const params = new URLSearchParams();
   if (options?.status === "completed") params.set("status", "completed");
   if (options?.projectId) params.set("projectId", options.projectId);
+  if (options?.context) params.set("context", options.context);
   const qs = params.toString();
   const res = await fetch(`${API}/reminders${qs ? `?${qs}` : ""}`);
   if (!res.ok) throw new Error("Reminders fetch failed");
@@ -264,10 +271,12 @@ export async function createReminder(
 export async function fetchNotes(options?: {
   status?: "active" | "completed";
   projectId?: string;
+  context?: "work" | "life";
 }): Promise<Note[]> {
   const params = new URLSearchParams();
   if (options?.status === "completed") params.set("status", "completed");
   if (options?.projectId) params.set("projectId", options.projectId);
+  if (options?.context) params.set("context", options.context);
   const qs = params.toString();
   const res = await fetch(`${API}/notes${qs ? `?${qs}` : ""}`);
   if (!res.ok) throw new Error("Notes fetch failed");

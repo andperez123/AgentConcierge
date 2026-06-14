@@ -4,6 +4,7 @@ import type { GeocodeResult, TempUnit } from "@concierge/shared";
 import { fetchGoogleAuthStatus, fetchSettings, saveSettings, searchGeocode } from "../api";
 import ActionTile from "../components/ActionTile";
 import GoogleAuthCard from "../components/GoogleAuthCard";
+import ModeThemeControls from "../components/ModeThemeControls";
 import type { GoogleAuthStatus } from "@concierge/shared";
 
 export default function Settings() {
@@ -110,6 +111,16 @@ export default function Settings() {
       </header>
 
       <div className="page-shell__body">
+        <section className="settings-section" aria-labelledby="appearance-heading">
+          <h2 id="appearance-heading" className="settings-section__title">
+            Appearance
+          </h2>
+          <p className="settings-section__hint">
+            Theme and Work/Life mode apply across the dashboard.
+          </p>
+          <ModeThemeControls />
+        </section>
+
         <GoogleAuthCard
           status={googleStatus ?? undefined}
           onRefresh={() => void fetchGoogleAuthStatus(true).then(setGoogleStatus)}

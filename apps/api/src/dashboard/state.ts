@@ -82,7 +82,10 @@ async function loadWeatherWithCache(force: boolean): Promise<{
   return { data: null, stale: true };
 }
 
-export async function buildDashboardState(force = false): Promise<DashboardState> {
+export async function buildDashboardState(
+  force = false,
+  mode?: "work" | "life",
+): Promise<DashboardState> {
   let status = null;
   let statusError: string | null = null;
   try {
@@ -144,9 +147,9 @@ export async function buildDashboardState(force = false): Promise<DashboardState
         data: weatherWidget.data,
       },
       hero: getHeroDisplay(),
-      reminders: listReminders().slice(0, 5),
-      notes: listNotes().slice(0, 3),
-      projects: listProjects().slice(0, 4).map((p) => ({
+      reminders: listReminders(undefined, mode).slice(0, 5),
+      notes: listNotes(undefined, mode).slice(0, 3),
+      projects: mode === "life" ? [] : listProjects().slice(0, 4).map((p) => ({
         id: p.id,
         name: p.name,
         status: p.status,

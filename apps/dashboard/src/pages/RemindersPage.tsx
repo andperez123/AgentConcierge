@@ -8,6 +8,7 @@ import {
   fetchReminders,
 } from "../api";
 import ReminderComposer from "../components/ReminderComposer";
+import { useAppPrefs } from "../context/AppPrefsContext";
 import {
   formatReminderDue,
   getReminderDueTone,
@@ -34,6 +35,7 @@ function defaultFilter(reminders: Reminder[]): ReminderFilter {
 
 export default function RemindersPage() {
   const navigate = useNavigate();
+  const { mode } = useAppPrefs();
   const [params, setParams] = useSearchParams();
   const tabParam = params.get("tab");
   const highlightId = params.get("id");
@@ -52,6 +54,7 @@ export default function RemindersPage() {
     try {
       const data = await fetchReminders({
         status: filter === "completed" ? "completed" : "active",
+        context: mode,
       });
       setReminders(data);
       if (!filterInitialized && filter !== "completed") {
@@ -61,7 +64,7 @@ export default function RemindersPage() {
     } catch {
       setReminders([]);
     }
-  }, [filter, filterInitialized]);
+  }, [filter, filterInitialized, mode]);
 
   useEffect(() => {
     void load();
@@ -115,7 +118,12 @@ export default function RemindersPage() {
   }
 
   async function handleCreate(text: string, dueAt?: string) {
-    const created = await createReminder({ text, dueAt, source: "dashboard" });
+    const created = await createReminder({
+      text,
+      dueAt,
+      source: "dashboard",
+      context: mode,
+    });
     setShowComposer(false);
     navigate(`/reminders/${created.id}`);
   }

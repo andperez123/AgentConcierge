@@ -95,20 +95,27 @@ db.exec(`
 `);
 
 function migrateSchema(): void {
-  const reminderCols = db
-    .prepare(`PRAGMA table_info(reminders)`)
-    .all() as Array<{ name: string }>;
-  if (!reminderCols.some((c) => c.name === "project_id")) {
+  function hasColumn(table: string, column: string): boolean {
+    const cols = db
+      .prepare(`PRAGMA table_info(${table})`)
+      .all() as Array<{ name: string }>;
+    return cols.some((c) => c.name === column);
+  }
+
+  if (!hasColumn("reminders", "project_id")) {
     db.exec(`ALTER TABLE reminders ADD COLUMN project_id TEXT`);
   }
-  const noteCols = db
-    .prepare(`PRAGMA table_info(notes)`)
-    .all() as Array<{ name: string }>;
-  if (!noteCols.some((c) => c.name === "project_id")) {
+  if (!hasColumn("notes", "project_id")) {
     db.exec(`ALTER TABLE notes ADD COLUMN project_id TEXT`);
   }
-  if (!noteCols.some((c) => c.name === "dismissed_at")) {
+  if (!hasColumn("notes", "dismissed_at")) {
     db.exec(`ALTER TABLE notes ADD COLUMN dismissed_at TEXT`);
+  }
+  if (!hasColumn("reminders", "context")) {
+    db.exec(`ALTER TABLE reminders ADD COLUMN context TEXT`);
+  }
+  if (!hasColumn("notes", "context")) {
+    db.exec(`ALTER TABLE notes ADD COLUMN context TEXT`);
   }
 }
 

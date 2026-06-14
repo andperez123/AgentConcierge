@@ -4,6 +4,7 @@ import { Pin, Plus } from "lucide-react";
 import type { Note } from "@concierge/shared";
 import { createNote, dismissNote, fetchNotes } from "../api";
 import NoteComposer from "../components/NoteComposer";
+import { useAppPrefs } from "../context/AppPrefsContext";
 
 type NoteFilter = "all" | "pinned" | "completed";
 
@@ -15,6 +16,7 @@ const FILTERS: Array<{ id: NoteFilter; label: string }> = [
 
 export default function NotesPage() {
   const navigate = useNavigate();
+  const { mode } = useAppPrefs();
   const [params, setParams] = useSearchParams();
   const tabParam = params.get("tab");
   const filter: NoteFilter =
@@ -28,12 +30,13 @@ export default function NotesPage() {
     try {
       const data = await fetchNotes({
         status: filter === "completed" ? "completed" : "active",
+        context: mode,
       });
       setNotes(data);
     } catch {
       setNotes([]);
     }
-  }, [filter]);
+  }, [filter, mode]);
 
   useEffect(() => {
     void load();
@@ -72,7 +75,7 @@ export default function NotesPage() {
   }
 
   async function handleCreate(text: string) {
-    await createNote({ text, source: "dashboard" });
+    await createNote({ text, source: "dashboard", context: mode });
     setShowComposer(false);
     await load();
   }

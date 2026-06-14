@@ -18,7 +18,9 @@ const router = Router();
 router.get("/state", async (req, res) => {
   try {
     const force = req.query.force === "1";
-    const state = await buildDashboardState(force);
+    const mode =
+      req.query.mode === "life" ? "life" : req.query.mode === "work" ? "work" : undefined;
+    const state = await buildDashboardState(force, mode);
     res.json(state);
   } catch (err) {
     res.status(500).json({

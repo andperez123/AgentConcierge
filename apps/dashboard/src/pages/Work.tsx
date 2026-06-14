@@ -8,6 +8,7 @@ import {
   fetchProjects,
   fetchReminders,
 } from "../api";
+import { useAppPrefs } from "../context/AppPrefsContext";
 import { formatReminderTime } from "../utils/format";
 import { formatProjectMeta } from "../utils/projectFormat";
 
@@ -15,6 +16,7 @@ type Tab = "all" | "reminders" | "notes" | "projects";
 
 export default function Work() {
   const navigate = useNavigate();
+  const { mode } = useAppPrefs();
   const [params, setParams] = useSearchParams();
   const tab = (params.get("tab") as Tab) || "all";
 
@@ -25,12 +27,17 @@ export default function Work() {
   const [draft, setDraft] = useState("");
   const [dueAt, setDueAt] = useState("");
 
+  const isWork = mode === "work";
+  const pageTitle = isWork ? "Work" : "Life";
+  const remindersLabel = isWork ? "Goals" : "Reminders";
+
   const load = useCallback(async () => {
     try {
+      const context = mode;
       const [r, n, p] = await Promise.all([
-        fetchReminders(),
-        fetchNotes(),
-        fetchProjects(),
+        fetchReminders({ context }),
+        fetchNotes({ context }),
+        isWork ? fetchProjects() : Promise.resolve([] as OpenClawProject[]),
       ]);
       setReminders(r);
       setNotes(n);
@@ -40,11 +47,17 @@ export default function Work() {
       setNotes([]);
       setProjects([]);
     }
-  }, []);
+  }, [mode, isWork]);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (!isWork && tab === "projects") {
+      setParams({});
+    }
+  }, [isWork, tab, setParams]);
 
   const combined = useMemo(() => {
     const items: Array<
@@ -65,6 +78,18 @@ export default function Work() {
     return items.sort((a, b) => b.sort.localeCompare(a.sort));
   }, [reminders, notes]);
 
+  const listItems =
+    tab === "reminders"
+      ? reminders.map((r) => ({ type: "reminder" as const, item: r }))
+      : tab === "notes"
+        ? notes.map((n) => ({ type: "note" as const, item: n }))
+        : combined;
+
+  const isEmpty =
+    tab === "projects"
+      ? projects.length === 0
+      : listItems.length === 0;
+
   function setTab(next: Tab) {
     setParams(next === "all" ? {} : { tab: next });
     setCreateKind(null);
@@ -73,15 +98,17 @@ export default function Work() {
   async function submitCreate() {
     const text = draft.trim();
     if (!text || !createKind) return;
+    const context = mode;
     if (createKind === "reminder") {
       const created = await createReminder({
         text,
         dueAt: dueAt ? new Date(dueAt).toISOString() : undefined,
         source: "dashboard",
+        context,
       });
       navigate(`/reminders/${created.id}`);
     } else {
-      const created = await createNote({ text, source: "dashboard" });
+      const created = await createNote({ text, source: "dashboard", context });
       navigate(`/notes/${created.id}`);
     }
     setDraft("");
@@ -99,19 +126,30 @@ export default function Work() {
     setCreateKind(null);
   }
 
+  const tabs: Array<[Tab, string]> = isWork
+    ? [
+        ["all", "All"],
+        ["reminders", remindersLabel],
+        ["notes", "Notes"],
+        ["projects", "Projects"],
+      ]
+    : [
+        ["all", "All"],
+        ["reminders", remindersLabel],
+        ["notes", "Notes"],
+      ];
+
   return (
     <div className="page-shell page-shell--work">
       <header className="page-shell__header">
-        <h1 className="page-title">Work</h1>
+        <h1 className="page-title">{pageTitle}</h1>
+        <p className="page-subtitle">
+          {isWork
+            ? "Goals, notes, and projects for work"
+            : "Personal reminders and notes"}
+        </p>
         <nav className="work-tabs" aria-label="Work sections">
-          {(
-            [
-              ["all", "All"],
-              ["reminders", "Reminders"],
-              ["notes", "Notes"],
-              ["projects", "Projects"],
-            ] as const
-          ).map(([id, label]) => (
+          {tabs.map(([id, label]) => (
             <button
               key={id}
               type="button"
@@ -134,7 +172,7 @@ export default function Work() {
                 setDueAt("");
               }}
             >
-              + Reminder
+              + {isWork ? "Goal" : "Reminder"}
             </button>
             <button
               type="button"
@@ -155,7 +193,11 @@ export default function Work() {
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               placeholder={
-                createKind === "reminder" ? "New reminder…" : "New note…"
+                createKind === "reminder"
+                  ? isWork
+                    ? "New work goal…"
+                    : "New reminder…"
+                  : "New note…"
               }
               rows={2}
             />
@@ -184,35 +226,36 @@ export default function Work() {
       </header>
 
       <div className="page-shell__body">
-        {tab === "projects" ? (
+        {isEmpty ? (
+          <div className="work-empty">
+            <p className="work-empty__text">
+              {isWork
+                ? tab === "projects"
+                  ? "No projects in ~/clawd/projects"
+                  : "No work goals yet. Create a goal or ask the agent to plan your work."
+                : "No life items yet. Add reminders, habits, or personal notes."}
+            </p>
+          </div>
+        ) : tab === "projects" ? (
           <ul className="work-project-list">
-            {projects.length === 0 ? (
-              <p className="reminder-empty">No projects in ~/clawd/projects</p>
-            ) : (
-              projects.map((p) => (
-                <li key={p.id}>
-                  <button
-                    type="button"
-                    className="list-page-item"
-                    onClick={() => navigate(`/projects/${p.id}`)}
-                  >
-                    {p.name}
-                    <span className="list-page-item__meta list-page-item__meta--truncate">
-                      {formatProjectMeta(p)}
-                    </span>
-                  </button>
-                </li>
-              ))
-            )}
+            {projects.map((p) => (
+              <li key={p.id}>
+                <button
+                  type="button"
+                  className="list-page-item"
+                  onClick={() => navigate(`/projects/${p.id}`)}
+                >
+                  {p.name}
+                  <span className="list-page-item__meta list-page-item__meta--truncate">
+                    {formatProjectMeta(p)}
+                  </span>
+                </button>
+              </li>
+            ))}
           </ul>
         ) : (
           <ul className="list-page-items">
-            {(tab === "reminders"
-              ? reminders.map((r) => ({ type: "reminder" as const, item: r }))
-              : tab === "notes"
-                ? notes.map((n) => ({ type: "note" as const, item: n }))
-                : combined
-            ).map((entry) => {
+            {listItems.map((entry) => {
               const key =
                 entry.type === "reminder"
                   ? `r-${entry.item.id}`

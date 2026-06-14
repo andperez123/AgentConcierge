@@ -1,14 +1,18 @@
 import { Link, useNavigate } from "react-router-dom";
 import { StickyNote, ChevronRight, Pin } from "lucide-react";
 import type { Note } from "@concierge/shared";
+import type { AppMode } from "../context/AppPrefsContext";
 
 interface Props {
   notes: Note[];
+  mode?: AppMode;
 }
 
-export default function NotesPanel({ notes }: Props) {
+export default function NotesPanel({ notes, mode = "work" }: Props) {
   const navigate = useNavigate();
-  const shown = notes.slice(0, 3);
+  const shown = notes.slice(0, 8);
+  const empty =
+    mode === "work" ? "No work notes" : "No personal notes yet";
 
   return (
     <article className="dash-card">
@@ -17,7 +21,7 @@ export default function NotesPanel({ notes }: Props) {
         <span>Notes</span>
       </header>
       {shown.length === 0 ? (
-        <p className="reminder-empty">No notes on the desk</p>
+        <p className="reminder-empty">{empty}</p>
       ) : (
         <ul className="reminder-list">
           {shown.map((n, i) => (
