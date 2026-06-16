@@ -64,7 +64,7 @@ function formatCalendarTime(start: string, allDay?: boolean): string {
   });
 }
 
-/** Calendar context block: a Google-Calendar mirror the agent keeps in sync. */
+/** Desk calendar: local events plus optional Google sync. */
 function buildCalendarContext(): string {
   const now = new Date();
   const from = now.toISOString();
@@ -74,10 +74,10 @@ function buildCalendarContext(): string {
 
   const lines = events.map(
     (e) =>
-      `- ${formatCalendarTime(e.start, e.allDay)}: ${truncate(e.title, 120)}${e.location ? ` @ ${truncate(e.location, 60)}` : ""}`,
+      `- ${formatCalendarTime(e.start, e.allDay)}: ${truncate(e.title, 120)}${e.location ? ` @ ${truncate(e.location, 60)}` : ""}${e.source === "google" ? " (Google)" : ""}`,
   );
 
-  return `Calendar (mirror of Google Calendar${lastSync ? `, last synced ${lastSync}` : ", not yet synced"}):
+  return `Desk calendar (local SQLite — Google sync optional${lastSync ? `, last Google sync ${lastSync}` : ""}):
 Next 7 days (${events.length} shown):
 ${lines.length ? lines.join("\n") : "(none)"}`;
 }
@@ -145,7 +145,7 @@ ${buildCalendarContext()}
 
 Instructions:
 - Perform actions via HTTP (GET/PATCH/DELETE reminders and notes, GET projects, POST /api/dashboard/commands for toast and navigate).
-- Calendar mirrors Google Calendar: GET /api/calendar/events to read, POST /api/calendar/sync to pull fresh events from Google, POST /api/calendar/events to push them. Navigate to /calendar to show the month. Do NOT invent events — only display what Google Calendar returns.
+- Desk calendar: GET /api/calendar/events to read. POST /api/calendar/events to add desk events (title, start, optional end/allDay/location). DELETE /api/calendar/events/:id to remove. Navigate to /calendar. Google Calendar is optional — POST /api/calendar/sync only when the operator wants to pull Google events.
 - Use GET /api/reminders/:id or GET /api/notes/:id for full text before editing (list context is truncated).
 - List completed history: GET /api/reminders?status=completed or GET /api/notes?status=completed.
 - Reply in 1–2 short sentences suitable for text-to-speech.
@@ -252,7 +252,7 @@ ${buildCalendarContext()}
 
 Instructions:
 - Perform actions via HTTP (GET/PATCH/DELETE reminders and notes, GET projects, POST /api/dashboard/commands for toast and navigate).
-- Calendar mirrors Google Calendar: GET /api/calendar/events to read, POST /api/calendar/sync to pull fresh events from Google, POST /api/calendar/events to push them. Navigate to /calendar to show the month. Do NOT invent events — only display what Google Calendar returns.
+- Desk calendar: GET /api/calendar/events to read. POST /api/calendar/events to add desk events (title, start, optional end/allDay/location). DELETE /api/calendar/events/:id to remove. Navigate to /calendar. Google Calendar is optional — POST /api/calendar/sync only when the operator wants to pull Google events.
 - Use GET /api/reminders/:id or GET /api/notes/:id for full text before editing (list context is truncated).
 - Reply in clear, concise prose (a short paragraph is fine).
 - After create/update, POST a toast and navigate to the detail route when helpful.

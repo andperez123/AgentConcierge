@@ -94,7 +94,7 @@ router.post("/sync", (req, res) => {
   void runCalendarSyncOperation(op.operationId, start, end);
   const response: ActionResponse = {
     ok: true,
-    message: "Calendar sync queued — pulling Google Calendar",
+    message: "Google Calendar sync queued (optional)",
     at: op.acceptedAt,
     operationId: op.operationId,
   };

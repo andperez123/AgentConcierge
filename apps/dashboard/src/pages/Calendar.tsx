@@ -5,11 +5,19 @@ import {
   ChevronLeft,
   ChevronRight,
   MapPin,
+  Plus,
   RefreshCw,
+  Trash2,
   X,
 } from "lucide-react";
 import type { CalendarEvent } from "@concierge/shared";
+import CalendarEventComposer, {
+  draftToEventInput,
+  type CalendarEventDraft,
+} from "../components/CalendarEventComposer";
 import {
+  createCalendarEvent,
+  deleteCalendarEvent,
   fetchCalendarEvents,
   fetchOperation,
   syncCalendar,
@@ -87,15 +95,19 @@ function formatMonthLabel(d: Date): string {
 }
 
 function formatLastSync(iso?: string): string {
-  if (!iso) return "Never synced";
+  if (!iso) return "Google not synced";
   const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "Never synced";
-  return `Synced ${d.toLocaleString(undefined, {
+  if (Number.isNaN(d.getTime())) return "Google not synced";
+  return `Google synced ${d.toLocaleString(undefined, {
     month: "short",
     day: "numeric",
     hour: "numeric",
     minute: "2-digit",
   })}`;
+}
+
+function isGoogleEvent(ev: CalendarEvent): boolean {
+  return ev.source === "google" || Boolean(ev.googleId);
 }
 
 export default function Calendar() {
@@ -108,6 +120,8 @@ export default function Calendar() {
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const [composerDay, setComposerDay] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const todayKey = useMemo(() => dayKey(new Date()), []);
@@ -186,6 +200,7 @@ export default function Calendar() {
     (next: Date) => {
       setMonthDate(next);
       setSelectedDay(null);
+      setComposerDay(null);
       setParams({ month: monthParam(next) }, { replace: true });
     },
     [setParams],
@@ -240,7 +255,7 @@ export default function Calendar() {
   const handleSync = useCallback(async () => {
     if (syncing) return;
     setSyncing(true);
-    setSyncMessage("Pulling Google Calendar…");
+    setSyncMessage("Pulling from Google Calendar…");
     try {
       const res = await syncCalendar({ month: monthParam(monthDate) });
       if (res.operationId) {
@@ -255,6 +270,41 @@ export default function Calendar() {
     }
   }, [syncing, monthDate, pollOperation, load]);
 
+  const monthEventCount = useMemo(() => {
+    const inMonth = new Set<string>();
+    for (const ev of events) {
+      for (const key of eventDayKeys(ev)) {
+        const [y, m] = key.split("-").map(Number);
+        if (y === monthDate.getFullYear() && m - 1 === monthDate.getMonth()) {
+          inMonth.add(ev.id);
+        }
+      }
+    }
+    return inMonth.size;
+  }, [events, monthDate]);
+
+  function openComposer(day?: string) {
+    const key = day ?? todayKey;
+    setComposerDay(key);
+    setSelectedDay(key);
+  }
+
+  async function handleCreateEvent(day: string, draft: CalendarEventDraft) {
+    await createCalendarEvent(draftToEventInput(day, draft));
+    setComposerDay(null);
+    await load();
+  }
+
+  async function handleDeleteEvent(id: string) {
+    setDeletingId(id);
+    try {
+      await deleteCalendarEvent(id);
+      await load();
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
   const selectedEvents = selectedDay
     ? (eventsByDay.get(selectedDay) ?? [])
     : [];
@@ -268,10 +318,19 @@ export default function Calendar() {
             {formatMonthLabel(monthDate)}
           </h1>
           <span className="calendar-page__sync-label">
-            {syncMessage ?? formatLastSync(lastSyncAt)}
+            {syncMessage ??
+              `${monthEventCount} event${monthEventCount === 1 ? "" : "s"} this month · ${formatLastSync(lastSyncAt)}`}
           </span>
         </div>
         <div className="calendar-page__controls">
+          <button
+            type="button"
+            className="calendar-add-btn"
+            aria-label="Add event"
+            onClick={() => openComposer()}
+          >
+            <Plus size={22} strokeWidth={2.5} />
+          </button>
           <button
             type="button"
             className="calendar-nav-btn"
@@ -294,6 +353,7 @@ export default function Calendar() {
           <button
             type="button"
             className="calendar-sync-btn"
+            title="Optional: pull events from Google Calendar"
             onClick={() => void handleSync()}
             disabled={syncing}
           >
@@ -301,7 +361,7 @@ export default function Calendar() {
               size={20}
               className={syncing ? "calendar-sync-btn__spin" : undefined}
             />
-            <span>{syncing ? "Syncing" : "Sync"}</span>
+            <span>{syncing ? "Syncing" : "Google"}</span>
           </button>
         </div>
       </header>
@@ -336,7 +396,9 @@ export default function Calendar() {
                 {shown.map((ev, i) => (
                   <span
                     key={`${ev.id}-${i}`}
-                    className={`calendar-chip${ev.allDay ? " calendar-chip--allday" : ""}`}
+                    className={`calendar-chip${
+                      ev.allDay ? " calendar-chip--allday" : ""
+                    }${isGoogleEvent(ev) ? " calendar-chip--google" : " calendar-chip--desk"}`}
                   >
                     {!ev.allDay && (
                       <span className="calendar-chip__time">
@@ -362,7 +424,10 @@ export default function Calendar() {
           className="calendar-day-sheet"
           role="dialog"
           aria-modal="true"
-          onClick={() => setSelectedDay(null)}
+          onClick={() => {
+            setSelectedDay(null);
+            setComposerDay(null);
+          }}
         >
           <div
             className="calendar-day-sheet__panel"
@@ -376,18 +441,48 @@ export default function Calendar() {
                   day: "numeric",
                 })}
               </h2>
-              <button
-                type="button"
-                className="calendar-day-sheet__close"
-                aria-label="Close"
-                onClick={() => setSelectedDay(null)}
-              >
-                <X size={22} />
-              </button>
+              <div className="calendar-day-sheet__header-actions">
+                <button
+                  type="button"
+                  className="calendar-day-sheet__add"
+                  onClick={() => openComposer(selectedDay)}
+                >
+                  <Plus size={18} /> Add
+                </button>
+                <button
+                  type="button"
+                  className="calendar-day-sheet__close"
+                  aria-label="Close"
+                  onClick={() => {
+                    setSelectedDay(null);
+                    setComposerDay(null);
+                  }}
+                >
+                  <X size={22} />
+                </button>
+              </div>
             </header>
-            {selectedEvents.length === 0 ? (
-              <p className="calendar-day-sheet__empty">No events</p>
-            ) : (
+            {composerDay === selectedDay && (
+              <div className="calendar-day-sheet__composer">
+                <CalendarEventComposer
+                  dayKey={selectedDay}
+                  onSave={(draft) => handleCreateEvent(selectedDay, draft)}
+                  onCancel={() => setComposerDay(null)}
+                />
+              </div>
+            )}
+            {selectedEvents.length === 0 && composerDay !== selectedDay ? (
+              <div className="calendar-day-sheet__empty-wrap">
+                <p className="calendar-day-sheet__empty">No events</p>
+                <button
+                  type="button"
+                  className="calendar-day-sheet__empty-cta action-card action-card--primary"
+                  onClick={() => openComposer(selectedDay)}
+                >
+                  Add event
+                </button>
+              </div>
+            ) : selectedEvents.length > 0 ? (
               <ul className="calendar-day-sheet__list">
                 {selectedEvents.map((ev, i) => (
                   <li key={`${ev.id}-${i}`} className="calendar-event-row">
@@ -397,6 +492,9 @@ export default function Calendar() {
                     <span className="calendar-event-row__body">
                       <span className="calendar-event-row__title">
                         {ev.title}
+                        {isGoogleEvent(ev) && (
+                          <span className="calendar-event-row__badge">Google</span>
+                        )}
                       </span>
                       {ev.location && (
                         <span className="calendar-event-row__meta">
@@ -409,10 +507,19 @@ export default function Calendar() {
                         </span>
                       )}
                     </span>
+                    <button
+                      type="button"
+                      className="calendar-event-row__delete"
+                      aria-label={`Remove ${ev.title}`}
+                      disabled={deletingId === ev.id}
+                      onClick={() => void handleDeleteEvent(ev.id)}
+                    >
+                      <Trash2 size={18} />
+                    </button>
                   </li>
                 ))}
               </ul>
-            )}
+            ) : null}
           </div>
         </div>
       )}

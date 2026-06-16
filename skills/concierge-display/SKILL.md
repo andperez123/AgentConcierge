@@ -25,8 +25,9 @@ Concierge API base: `http://127.0.0.1:3080/api`
 | Project breakdown | `GET /api/projects/:id` |
 | Export project context to disk (Markdown) | `POST /api/projects/:id/export` → `~/clawd/exports/<id>-context.md` |
 | Agent action on reminder/note/project | `POST /api/work/:kind/:id/actions` |
-| Read the desk calendar (Google mirror) | `GET /api/calendar/events?from=&to=` |
-| Pull Google Calendar onto the desk | `POST /api/calendar/sync` then push via `POST /api/calendar/events` |
+| Read the desk calendar | `GET /api/calendar/events?from=&to=` |
+| Add a desk calendar event | `POST /api/calendar/events` (single event body) |
+| Optional: pull Google Calendar | `POST /api/calendar/sync` then push via bulk `POST /api/calendar/events` |
 | Google auth status (display) | `GET /api/openclaw/google/status` |
 | Google reauth (Pi / Drive) | `POST /api/openclaw/google/reauth` |
 
@@ -123,6 +124,9 @@ END_VOICE_RESULT_JSON
 | "What did I complete?" | `GET /api/reminders?status=completed` and/or `GET /api/notes?status=completed`, summarize |
 | "Update reminder 4 to …" | `GET /api/reminders/4` then `PATCH` + `navigateTo: "/reminders/4"` |
 | "Edit note 3: …" | `PATCH /api/notes/3` + `navigateTo: "/notes/3"` |
+| "Add calendar event …" / "Schedule …" | `POST /api/calendar/events` + toast; `navigateTo: "/calendar"` |
+| "What's on my calendar?" | `GET /api/calendar/events`, summarize upcoming |
+| "Sync Google calendar" (optional) | `POST /api/calendar/sync`, then push events back |
 | "List projects" | `GET /api/projects`, summarize in `spokenReply` |
 | "Add reminder for revenue-factory: …" | `POST /api/reminders` with `projectId: "revenue-factory"` |
 
@@ -255,23 +259,46 @@ Voice: `navigateTo: "/projects/novapay"` after summarizing; `GET /api/dashboard/
 
 When the operator starts a **new startup/idea project**, ask for: slug, display name, vision, status, task breakdown, and next focus — then write `OVERVIEW.md` + `TASKS.md` and link time-bound work via `POST /api/reminders` with `projectId`.
 
-## Calendar (mirror of Google Calendar)
+## Calendar (desk + optional Google)
 
-The kiosk **Calendar** screen (`/calendar`) shows a monthly grid that **mirrors the operator's Google Calendar**. Concierge does **not** call Google APIs directly — you pull events with your connected Google account and push them to Concierge, which caches them in SQLite and renders the month.
+The kiosk **Calendar** screen (`/calendar`) is a **local desk calendar** stored in Concierge SQLite. You do **not** need Google Calendar — the operator can add events on the kiosk (+ button or day sheet), and you can add events via API or voice.
 
-Concierge does not invent events. Only display what Google Calendar returns.
+**Optional:** pull the operator's Google Calendar with `POST /api/calendar/sync` (requires your connected Google account with Calendar access). Google events appear alongside desk events; re-sync replaces only the Google-sourced window.
 
-### How sync works
-
-1. The kiosk "Sync from Google" button (or you, via `POST /api/calendar/sync`) queues an `openclaw agent` turn asking you to pull the calendar for a window.
-2. You list Google Calendar events for that window using your Google account.
-3. You POST them back to Concierge. The kiosk updates live via SSE.
+### Desk events (no Google required)
 
 ```bash
-# Read what is currently on the desk calendar (ISO bounds, both optional)
+# Read events (ISO bounds optional)
 curl -s "http://127.0.0.1:3080/api/calendar/events?from=2026-06-01T00:00:00Z&to=2026-07-01T00:00:00Z"
 
-# Push a synced window. `replaceRange` clears stale/cancelled google events first.
+# Add one desk event
+curl -s -X POST http://127.0.0.1:3080/api/calendar/events \
+  -H 'Content-Type: application/json' \
+  -d '{"title":"Dentist","start":"2026-06-16T14:00:00Z","end":"2026-06-16T15:00:00Z","source":"openclaw"}'
+
+# All-day event (use YYYY-MM-DD + allDay)
+curl -s -X POST http://127.0.0.1:3080/api/calendar/events \
+  -H 'Content-Type: application/json' \
+  -d '{"title":"Birthday","start":"2026-06-20","allDay":true}'
+
+curl -s -X DELETE http://127.0.0.1:3080/api/calendar/events/<id>
+
+curl -s -X POST http://127.0.0.1:3080/api/dashboard/commands \
+  -H 'Content-Type: application/json' \
+  -d '{"type":"navigate","route":"/calendar"}'
+```
+
+### Optional Google sync
+
+1. Operator taps **Google** on the calendar screen (or you call `POST /api/calendar/sync`).
+2. You list Google Calendar events for the window using your Google account.
+3. POST them back with `replaceRange` so stale Google events are cleared.
+
+```bash
+curl -s -X POST http://127.0.0.1:3080/api/calendar/sync \
+  -H 'Content-Type: application/json' \
+  -d '{"month":"2026-06"}'
+
 curl -s -X POST http://127.0.0.1:3080/api/calendar/events \
   -H 'Content-Type: application/json' \
   -d '{
@@ -284,37 +311,19 @@ curl -s -X POST http://127.0.0.1:3080/api/calendar/events \
         "start": "2026-06-16T09:30:00Z",
         "end": "2026-06-16T10:00:00Z",
         "allDay": false,
-        "status": "confirmed",
-        "htmlLink": "https://calendar.google.com/event?eid=..."
-      },
-      {
-        "googleId": "def456",
-        "calendarId": "primary",
-        "title": "Conference",
-        "start": "2026-06-20",
-        "allDay": true,
         "status": "confirmed"
       }
     ]
   }'
-
-# Delete a single cached event
-curl -s -X DELETE http://127.0.0.1:3080/api/calendar/events/<id>
-
-# Show the month on the kiosk
-curl -s -X POST http://127.0.0.1:3080/api/dashboard/commands \
-  -H 'Content-Type: application/json' \
-  -d '{"type":"navigate","route":"/calendar"}'
 ```
+
+Poll sync: `GET /api/operations/:id`
 
 Field notes:
 
-- `start`/`end`: ISO datetimes for timed events; `YYYY-MM-DD` dates for `allDay: true`.
-- `googleId`: use the Google event id so re-syncing de-duplicates instead of creating duplicates.
-- Always send `replaceRange` covering the window you synced so removed/cancelled events disappear from the kiosk.
-- `status: "cancelled"` events are hidden from the kiosk (and cleared by `replaceRange`).
-
-`POST /api/calendar/sync` (queues this whole flow): optional body `{ "month": "2026-06" }` or `{ "rangeStart": "<iso>", "rangeEnd": "<iso>" }`. Poll `GET /api/operations/:id`.
+- `start`/`end`: ISO datetimes for timed events; `YYYY-MM-DD` for `allDay: true`.
+- Desk events use `source: "dashboard"` or `"openclaw"` / `"agent"`. Google sync sets `source: "google"`.
+- `googleId` + `replaceRange` only needed for Google bulk sync.
 
 ## Work entity actions (agent + Drive via OpenClaw)
 
