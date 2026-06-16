@@ -249,6 +249,163 @@ export async function runRefreshProbesOperation(
   emitDashboardEvent("operation-updated", { operationId });
 }
 
+function buildMockCalendarEvents(
+  rangeStart: string,
+  rangeEnd: string,
+): import("@concierge/shared").CalendarEventInput[] {
+  const start = new Date(rangeStart);
+  const end = new Date(rangeEnd);
+  // Anchor near the middle of the window so the displayed month is populated.
+  const base = new Date((start.getTime() + end.getTime()) / 2);
+  base.setDate(base.getDate() - 12);
+  const events: import("@concierge/shared").CalendarEventInput[] = [];
+  const samples = [
+    { title: "Team standup", hour: 9, minutes: 30, dayOffset: 1 },
+    { title: "Dentist appointment", hour: 14, minutes: 0, dayOffset: 3 },
+    { title: "Gym", hour: 18, minutes: 0, dayOffset: 5 },
+    { title: "Project review", hour: 11, minutes: 0, dayOffset: 9 },
+    { title: "Lunch with Sam", hour: 12, minutes: 30, dayOffset: 12 },
+    { title: "Flight to NYC", hour: 7, minutes: 0, dayOffset: 18 },
+  ];
+  for (const s of samples) {
+    const day = new Date(base);
+    day.setDate(day.getDate() + s.dayOffset);
+    if (day < start || day >= end) continue;
+    const evStart = new Date(day);
+    evStart.setHours(s.hour, s.minutes, 0, 0);
+    const evEnd = new Date(evStart);
+    evEnd.setHours(evStart.getHours() + 1);
+    events.push({
+      googleId: `mock-${evStart.toISOString().slice(0, 10)}-${s.title}`,
+      calendarId: "primary",
+      title: s.title,
+      start: evStart.toISOString(),
+      end: evEnd.toISOString(),
+      allDay: false,
+      status: "confirmed",
+      source: "google",
+    });
+  }
+  // One all-day event.
+  const allDay = new Date(base);
+  allDay.setDate(allDay.getDate() + 7);
+  events.push({
+    googleId: `mock-allday-${allDay.toISOString().slice(0, 10)}`,
+    calendarId: "primary",
+    title: "Conference (all day)",
+    start: allDay.toISOString().slice(0, 10),
+    allDay: true,
+    status: "confirmed",
+    source: "google",
+  });
+  return events;
+}
+
+export async function runCalendarSyncOperation(
+  operationId: string,
+  rangeStart: string,
+  rangeEnd: string,
+): Promise<void> {
+  updateOperation(operationId, {
+    state: "running",
+    startedAt: new Date().toISOString(),
+  });
+  emitDashboardEvent("operation-updated", { operationId, state: "running" });
+
+  const { syncCalendarEvents } = await import("../calendar/store.js");
+
+  if (MOCK_OPENCLAW) {
+    const mockEvents = buildMockCalendarEvents(rangeStart, rangeEnd);
+    const { upserted } = syncCalendarEvents(mockEvents, {
+      start: rangeStart,
+      end: rangeEnd,
+    });
+    const message = `Mock sync — pulled ${upserted} Google Calendar events`;
+    updateOperation(operationId, {
+      state: "succeeded",
+      message,
+      finishedAt: new Date().toISOString(),
+    });
+    emitDashboardEvent("operation-updated", {
+      operationId,
+      state: "succeeded",
+      message,
+    });
+    emitDashboardEvent("state-changed", {});
+    return;
+  }
+
+  const instruction = [
+    "Sync the operator's Google Calendar into the Concierge desk display.",
+    `Use your connected Google account to list events between ${rangeStart} and ${rangeEnd} (inclusive of all calendars you can read, but prefer the primary calendar).`,
+    "Then POST them to Concierge so the kiosk monthly calendar mirrors Google Calendar:",
+    "",
+    "POST http://127.0.0.1:3080/api/calendar/events",
+    "Content-Type: application/json",
+    JSON.stringify(
+      {
+        replaceRange: { start: rangeStart, end: rangeEnd },
+        events: [
+          {
+            googleId: "<google event id>",
+            calendarId: "primary",
+            title: "<summary>",
+            description: "<optional>",
+            location: "<optional>",
+            start: "<ISO datetime, or YYYY-MM-DD for all-day>",
+            end: "<ISO datetime, or YYYY-MM-DD for all-day, optional>",
+            allDay: false,
+            status: "confirmed",
+            htmlLink: "<optional google link>",
+          },
+        ],
+      },
+      null,
+      2,
+    ),
+    "",
+    "Rules:",
+    "- Always include `replaceRange` so cancelled/removed events are cleared from the window.",
+    "- Send all events in a single POST when possible.",
+    "- Use the Google event id as `googleId` so re-syncing stays de-duplicated.",
+    "- For all-day events set `allDay: true` and use YYYY-MM-DD dates.",
+    "- Reply with a one-sentence summary of how many events you synced.",
+  ].join("\n");
+
+  try {
+    const { sendAgentMessage } = await import("../openclaw/adapter.js");
+    const result = await sendAgentMessage(instruction, "chat");
+    const message = result.ok
+      ? `Calendar sync requested — ${result.reply?.slice(0, 160) ?? "agent finished"}`
+      : "Calendar sync failed";
+    updateOperation(operationId, {
+      state: result.ok ? "succeeded" : "failed",
+      message: message.slice(0, 500),
+      finishedAt: new Date().toISOString(),
+      error: result.ok ? undefined : message,
+    });
+    emitDashboardEvent("operation-updated", {
+      operationId,
+      state: result.ok ? "succeeded" : "failed",
+      message: message.slice(0, 200),
+    });
+    emitDashboardEvent("state-changed", {});
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Calendar sync failed";
+    updateOperation(operationId, {
+      state: "failed",
+      message,
+      finishedAt: new Date().toISOString(),
+      error: message,
+    });
+    emitDashboardEvent("operation-updated", {
+      operationId,
+      state: "failed",
+      message,
+    });
+  }
+}
+
 export async function runWorkEntityAction(
   operationId: string,
   kind: import("@concierge/shared").WorkEntityKind,

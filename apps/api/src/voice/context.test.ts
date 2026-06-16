@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
-  buildVoiceAgentMessage,
+  buildChatAgentMessage,
   buildMockVoiceReply,
+  buildVoiceAgentMessage,
   VOICE_CONTEXT_LIMITS,
 } from "./context.js";
 
@@ -22,6 +23,19 @@ describe("buildVoiceAgentMessage", () => {
     assert.match(msg, /Projects \(\d+/);
     assert.match(msg, /Desk summary:/);
     assert.match(msg, /Recently completed reminders/);
+  });
+});
+
+describe("buildChatAgentMessage", () => {
+  it("includes user text and conversation history", () => {
+    const msg = buildChatAgentMessage("hello again", [
+      { role: "user", text: "hi" },
+      { role: "agent", text: "How can I help?" },
+    ]);
+    assert.match(msg, /hello again/i);
+    assert.match(msg, /Operator: hi/);
+    assert.match(msg, /Agent: How can I help/);
+    assert.match(msg, /VOICE_RESULT_JSON:/);
   });
 });
 

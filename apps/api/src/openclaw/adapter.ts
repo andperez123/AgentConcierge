@@ -448,8 +448,18 @@ function extractAgentReply(stdout: string): string {
   }
 }
 
+function resolveAgentId(purpose: "voice" | "chat" = "voice"): string | undefined {
+  const chat = process.env.OPENCLAW_CHAT_AGENT?.trim();
+  const voice = process.env.OPENCLAW_VOICE_AGENT?.trim();
+  if (purpose === "chat") return chat || voice || undefined;
+  return voice || chat || undefined;
+}
+
 /** Run one agent turn via `openclaw agent --message` (Gateway on Pi). */
-export async function sendAgentMessage(message: string): Promise<AgentTurnResult> {
+export async function sendAgentMessage(
+  message: string,
+  purpose: "voice" | "chat" = "voice",
+): Promise<AgentTurnResult> {
   const text = message.trim();
   if (!text) throw new Error("Message is required");
 
@@ -461,7 +471,7 @@ export async function sendAgentMessage(message: string): Promise<AgentTurnResult
     };
   }
 
-  const agentId = process.env.OPENCLAW_VOICE_AGENT?.trim();
+  const agentId = resolveAgentId(purpose);
   const args = ["agent", "--message", text, "--json"];
   if (agentId) args.splice(1, 0, "--agent", agentId);
 

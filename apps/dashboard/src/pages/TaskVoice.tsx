@@ -301,7 +301,15 @@ export default function TaskVoice() {
       <header className="page-shell__header">
         <h1 className="page-title">Voice command</h1>
         <p className="page-subtitle voice-page__hint">
-          Hands-free mode sends each phrase to OpenClaw. Desk items appear on{" "}
+          Hands-free mode sends each phrase to OpenClaw. Prefer typing?{" "}
+          <button
+            type="button"
+            className="voice-page__link"
+            onClick={() => navigate("/task/chat")}
+          >
+            Open chat
+          </button>
+          . Desk items appear on{" "}
           <button
             type="button"
             className="voice-page__link"

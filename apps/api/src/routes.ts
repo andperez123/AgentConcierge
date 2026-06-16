@@ -63,8 +63,11 @@ import {
 } from "./alerts.js";
 import type { CreateAlertBody, SetHeroBody } from "@concierge/shared";
 import { getHeroDisplay, setHeroDisplay } from "./display/hero.js";
+import calendarRouter from "./calendar/routes.js";
 import { emitDashboardEvent } from "./dashboard/events.js";
 import {
+  buildChatAgentMessage,
+  buildMockChatReply,
   buildMockVoiceReply,
   buildVoiceAgentMessage,
 } from "./voice/context.js";
@@ -89,6 +92,7 @@ import {
 const router = Router();
 
 router.use("/dashboard", dashboardRouter);
+router.use("/calendar", calendarRouter);
 
 router.get("/health", (_req, res) => {
   const body: HealthResponse = {
@@ -602,6 +606,54 @@ router.post("/work/:kind/:id/actions", (req, res) => {
 
 router.get("/display/hero", (_req, res) => {
   res.json(getHeroDisplay());
+});
+
+router.post("/agent/chat", async (req, res) => {
+  try {
+    const text = String(req.body?.text ?? "").trim();
+    if (!text) {
+      res.status(400).json({ error: "text is required" });
+      return;
+    }
+    const rawHistory = Array.isArray(req.body?.history) ? req.body.history : [];
+    const history = rawHistory
+      .filter((t: unknown): t is { role: "user" | "agent"; text: string } => {
+        if (typeof t !== "object" || t === null) return false;
+        const row = t as { role?: string; text?: unknown };
+        return (
+          (row.role === "user" || row.role === "agent") &&
+          typeof row.text === "string"
+        );
+      })
+      .map((t: { role: "user" | "agent"; text: string }) => ({
+        role: t.role,
+        text: String(t.text).trim(),
+      }))
+      .filter((t: { text: string }) => t.text.length > 0)
+      .slice(-8);
+
+    if (MOCK_OPENCLAW) {
+      res.json({
+        ok: true,
+        reply: buildMockChatReply(text, history),
+        mock: true,
+        at: new Date().toISOString(),
+      });
+      return;
+    }
+    const message = buildChatAgentMessage(text, history);
+    const result = await sendAgentMessage(message, "chat");
+    res.json({
+      ok: result.ok,
+      reply: result.reply,
+      mock: result.mock,
+      at: new Date().toISOString(),
+    });
+  } catch (err) {
+    res.status(500).json({
+      error: err instanceof Error ? err.message : "Agent chat failed",
+    });
+  }
 });
 
 router.post("/voice/command", async (req, res) => {

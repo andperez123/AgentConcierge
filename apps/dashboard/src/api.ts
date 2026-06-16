@@ -2,6 +2,9 @@ import type {
   ActionResponse,
   Alert,
   AppSettings,
+  CalendarEvent,
+  CalendarEventInput,
+  CalendarEventsResponse,
   CreateAlertBody,
   CreateNoteBody,
   CreateReminderBody,
@@ -28,6 +31,8 @@ import type {
   UpdateNoteBody,
   UpdateReminderBody,
   VoiceCommandResponse,
+  AgentChatResponse,
+  AgentChatTurn,
   Weather,
   WorkEntityActionBody,
   WorkEntityKind,
@@ -293,6 +298,22 @@ export async function dismissNote(id: number): Promise<void> {
   await fetch(`${API}/notes/${id}`, { method: "DELETE" });
 }
 
+export async function postAgentChat(
+  text: string,
+  history: AgentChatTurn[] = [],
+): Promise<AgentChatResponse> {
+  const res = await fetch(`${API}/agent/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text, history }),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error ?? "Agent chat failed");
+  }
+  return data as AgentChatResponse;
+}
+
 export async function postVoiceCommand(
   text: string,
 ): Promise<VoiceCommandResponse> {
@@ -377,6 +398,52 @@ export async function exportProjectContext(
     throw new Error(body.message ?? "Export failed");
   }
   return body;
+}
+
+export async function fetchCalendarEvents(range?: {
+  from?: string;
+  to?: string;
+}): Promise<CalendarEventsResponse> {
+  const params = new URLSearchParams();
+  if (range?.from) params.set("from", range.from);
+  if (range?.to) params.set("to", range.to);
+  const qs = params.toString();
+  const res = await fetch(`${API}/calendar/events${qs ? `?${qs}` : ""}`);
+  if (!res.ok) throw new Error("Calendar fetch failed");
+  return res.json();
+}
+
+export async function syncCalendar(opts?: {
+  month?: string;
+  rangeStart?: string;
+  rangeEnd?: string;
+}): Promise<ActionResponse> {
+  const res = await fetch(`${API}/calendar/sync`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(opts ?? {}),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error ?? "Calendar sync failed");
+  return data as ActionResponse;
+}
+
+export async function createCalendarEvent(
+  body: CalendarEventInput,
+): Promise<CalendarEvent> {
+  const res = await fetch(`${API}/calendar/events`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...body, source: body.source ?? "dashboard" }),
+  });
+  if (!res.ok) throw new Error("Failed to create event");
+  return res.json();
+}
+
+export async function deleteCalendarEvent(id: string): Promise<void> {
+  await fetch(`${API}/calendar/events/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
 }
 
 export async function postWorkEntityAction(

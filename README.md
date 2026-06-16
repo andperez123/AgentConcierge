@@ -37,6 +37,44 @@ On the Pi, `deploy/systemd/concierge-api.service` sets `MOCK_OPENCLAW=0`.
 - Optional: `OPENCLAW_VOICE_AGENT=<id>` in `.env` for a dedicated agent with the `concierge-display` skill.
 - Chromium on the Pi must allow microphone access for the kiosk profile once.
 
+### Agent chat (kiosk text)
+
+- **Settings → Open desk chat** or `/task/chat` — typed messages with conversation history in-session.
+- API: `POST /api/agent/chat` with `{ "text": "...", "history": [{ "role": "user"|"agent", "text": "..." }] }`.
+- Optional: `OPENCLAW_CHAT_AGENT=<id>` (falls back to `OPENCLAW_VOICE_AGENT`).
+
+### Telegram (phone — recommended for remote chat)
+
+Concierge does **not** run its own Telegram bot. Use **OpenClaw’s built-in Telegram channel** on the Pi gateway so you get full multi-turn conversations in the Telegram app (not single-turn CLI calls).
+
+1. Create a bot with [@BotFather](https://t.me/BotFather) and save the token.
+2. On the Pi, add to OpenClaw config (see [Telegram channel docs](https://docs.openclaw.ai/channels/telegram)):
+
+```json5
+{
+  channels: {
+    telegram: {
+      enabled: true,
+      botToken: "YOUR_TOKEN",
+      dmPolicy: "pairing",
+    },
+  },
+}
+```
+
+Or set `TELEGRAM_BOT_TOKEN=...` and restart the gateway.
+
+3. Message your bot from Telegram, then approve pairing on the Pi:
+
+```bash
+openclaw pairing list telegram
+openclaw pairing approve telegram <CODE>
+```
+
+4. Give your agent the `concierge-display` skill (same agent as voice/chat if you use `OPENCLAW_VOICE_AGENT`).
+
+From Telegram you can ask the agent to update the kiosk, add reminders, push toasts, etc. — the agent calls `http://127.0.0.1:3080/api` on the Pi.
+
 ## Develop on Mac
 
 ```bash

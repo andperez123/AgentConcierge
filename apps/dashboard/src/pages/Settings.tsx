@@ -126,6 +126,61 @@ export default function Settings() {
           onRefresh={() => void fetchGoogleAuthStatus(true).then(setGoogleStatus)}
         />
 
+        <section className="settings-section" aria-labelledby="agent-chat-heading">
+          <h2 id="agent-chat-heading" className="settings-section__title">
+            Agent messaging
+          </h2>
+          <p className="settings-section__hint">
+            Chat with your OpenClaw agent from the desk or from Telegram on your phone.
+          </p>
+          <ActionTile
+            label="Open desk chat"
+            variant="secondary"
+            onClick={() => navigate("/task/chat")}
+          />
+        </section>
+
+        <section className="settings-section" aria-labelledby="telegram-heading">
+          <h2 id="telegram-heading" className="settings-section__title">
+            Telegram (recommended for phone)
+          </h2>
+          <p className="settings-section__hint">
+            OpenClaw owns Telegram on the Pi gateway — full conversation history,
+            pairing security, and replies in the Telegram app. Your agent uses the{" "}
+            <code>concierge-display</code> skill to control this kiosk.
+          </p>
+          <ol className="settings-steps">
+            <li>
+              Create a bot with{" "}
+              <a href="https://t.me/BotFather" target="_blank" rel="noreferrer">
+                @BotFather
+              </a>{" "}
+              and copy the token.
+            </li>
+            <li>
+              Add to OpenClaw config on the Pi (or{" "}
+              <code>TELEGRAM_BOT_TOKEN</code> env), then restart the gateway.
+            </li>
+            <li>
+              Message your bot, then on the Pi:{" "}
+              <code>openclaw pairing approve telegram &lt;CODE&gt;</code>
+            </li>
+            <li>
+              Ensure your agent has the <code>concierge-display</code> skill.
+            </li>
+          </ol>
+          <p className="settings-section__hint">
+            Docs:{" "}
+            <a
+              href="https://docs.openclaw.ai/channels/telegram"
+              target="_blank"
+              rel="noreferrer"
+            >
+              docs.openclaw.ai/channels/telegram
+            </a>
+          </p>
+        </section>
+
         <label className="field-label" htmlFor="city">
           City or ZIP
         </label>

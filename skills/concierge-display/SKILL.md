@@ -19,11 +19,14 @@ Concierge API base: `http://127.0.0.1:3080/api`
 | Toast, navigate screen, focus incident | `POST /api/dashboard/commands` |
 | Center hero quote / motivational card | `POST /api/display/hero` |
 | Voice / spoken command to the agent | `POST /api/voice/command` |
+| Desk text chat (kiosk UI) | `POST /api/agent/chat` |
 | Full desk snapshot | `GET /api/dashboard/state` |
 | List OpenClaw projects (`~/clawd/projects/`) | `GET /api/projects` |
 | Project breakdown | `GET /api/projects/:id` |
 | Export project context to disk (Markdown) | `POST /api/projects/:id/export` → `~/clawd/exports/<id>-context.md` |
 | Agent action on reminder/note/project | `POST /api/work/:kind/:id/actions` |
+| Read the desk calendar (Google mirror) | `GET /api/calendar/events?from=&to=` |
+| Pull Google Calendar onto the desk | `POST /api/calendar/sync` then push via `POST /api/calendar/events` |
 | Google auth status (display) | `GET /api/openclaw/google/status` |
 | Google reauth (Pi / Drive) | `POST /api/openclaw/google/reauth` |
 
@@ -63,6 +66,30 @@ Requires Chromium microphone permission on the kiosk (allow once in Chromium sit
 
 The API enriches each voice turn with current reminders, notes, and projects. You must perform desk mutations via HTTP and end every reply with the result block below.
 
+## Desk text chat (kiosk)
+
+The dashboard **Agent chat** screen (`/task/chat`) sends typed messages with in-session history:
+
+```bash
+curl -s -X POST http://127.0.0.1:3080/api/agent/chat \
+  -H 'Content-Type: application/json' \
+  -d '{"text":"Add reminder: ship auth fix","history":[{"role":"user","text":"What is on my desk?"}]}'
+```
+
+Optional env: `OPENCLAW_CHAT_AGENT=<agent-id>` (falls back to `OPENCLAW_VOICE_AGENT`).
+
+Use the same **Voice result block** at the end of chat replies when the operator should see navigation or pending confirmations on the kiosk.
+
+## Telegram (operator phone — preferred for remote chat)
+
+**Do not** add a Telegram bot inside Concierge. The OpenClaw **gateway** owns Telegram on the Pi: full conversation history, pairing, and replies in the Telegram app.
+
+1. Configure `channels.telegram` in OpenClaw (or `TELEGRAM_BOT_TOKEN`) — see https://docs.openclaw.ai/channels/telegram
+2. Restart gateway; message the bot; `openclaw pairing approve telegram <CODE>`
+3. Ensure this agent has the `concierge-display` skill so Telegram messages can drive the kiosk via `http://127.0.0.1:3080/api`
+
+When the operator messages from Telegram, treat it like remote desk control: update reminders/notes, push toasts, navigate the kiosk when appropriate.
+
 ### Voice result block (mandatory)
 
 End every voice reply with this exact format (valid JSON between markers):
@@ -80,7 +107,7 @@ END_VOICE_RESULT_JSON
 
 - `spokenReply`: short text for TTS (required).
 - `actionsTaken`: e.g. `created_reminder`, `dismissed_note`, `updated_note`, `opened_reminder`, `completed_reminder`, `listed_completed`, `listed_projects`.
-- `navigateTo`: null or one of `/`, `/work`, `/work?tab=projects`, `/work?tab=reminders`, `/work?tab=notes`, `/reminders`, `/reminders/<id>`, `/notes`, `/notes/<id>`, `/projects/<slug>` (slug: `a-z0-9-`).
+- `navigateTo`: null or one of `/`, `/work`, `/work?tab=projects`, `/work?tab=reminders`, `/work?tab=notes`, `/reminders`, `/reminders/<id>`, `/notes`, `/notes/<id>`, `/projects/<slug>` (slug: `a-z0-9-`), `/calendar`, `/calendar?month=YYYY-MM`.
 - `pendingAction`: set when awaiting confirm for fuzzy dismiss, e.g. `{ "kind": "dismiss_reminder", "id": 4 }`.
 
 ### Voice command playbook
@@ -227,6 +254,67 @@ curl -s -X POST http://127.0.0.1:3080/api/projects/sync \
 Voice: `navigateTo: "/projects/novapay"` after summarizing; `GET /api/dashboard/state` includes `widgets.projects` for the home card.
 
 When the operator starts a **new startup/idea project**, ask for: slug, display name, vision, status, task breakdown, and next focus — then write `OVERVIEW.md` + `TASKS.md` and link time-bound work via `POST /api/reminders` with `projectId`.
+
+## Calendar (mirror of Google Calendar)
+
+The kiosk **Calendar** screen (`/calendar`) shows a monthly grid that **mirrors the operator's Google Calendar**. Concierge does **not** call Google APIs directly — you pull events with your connected Google account and push them to Concierge, which caches them in SQLite and renders the month.
+
+Concierge does not invent events. Only display what Google Calendar returns.
+
+### How sync works
+
+1. The kiosk "Sync from Google" button (or you, via `POST /api/calendar/sync`) queues an `openclaw agent` turn asking you to pull the calendar for a window.
+2. You list Google Calendar events for that window using your Google account.
+3. You POST them back to Concierge. The kiosk updates live via SSE.
+
+```bash
+# Read what is currently on the desk calendar (ISO bounds, both optional)
+curl -s "http://127.0.0.1:3080/api/calendar/events?from=2026-06-01T00:00:00Z&to=2026-07-01T00:00:00Z"
+
+# Push a synced window. `replaceRange` clears stale/cancelled google events first.
+curl -s -X POST http://127.0.0.1:3080/api/calendar/events \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "replaceRange": { "start": "2026-06-01T00:00:00Z", "end": "2026-07-01T00:00:00Z" },
+    "events": [
+      {
+        "googleId": "abc123",
+        "calendarId": "primary",
+        "title": "Team standup",
+        "start": "2026-06-16T09:30:00Z",
+        "end": "2026-06-16T10:00:00Z",
+        "allDay": false,
+        "status": "confirmed",
+        "htmlLink": "https://calendar.google.com/event?eid=..."
+      },
+      {
+        "googleId": "def456",
+        "calendarId": "primary",
+        "title": "Conference",
+        "start": "2026-06-20",
+        "allDay": true,
+        "status": "confirmed"
+      }
+    ]
+  }'
+
+# Delete a single cached event
+curl -s -X DELETE http://127.0.0.1:3080/api/calendar/events/<id>
+
+# Show the month on the kiosk
+curl -s -X POST http://127.0.0.1:3080/api/dashboard/commands \
+  -H 'Content-Type: application/json' \
+  -d '{"type":"navigate","route":"/calendar"}'
+```
+
+Field notes:
+
+- `start`/`end`: ISO datetimes for timed events; `YYYY-MM-DD` dates for `allDay: true`.
+- `googleId`: use the Google event id so re-syncing de-duplicates instead of creating duplicates.
+- Always send `replaceRange` covering the window you synced so removed/cancelled events disappear from the kiosk.
+- `status: "cancelled"` events are hidden from the kiosk (and cleared by `replaceRange`).
+
+`POST /api/calendar/sync` (queues this whole flow): optional body `{ "month": "2026-06" }` or `{ "rangeStart": "<iso>", "rangeEnd": "<iso>" }`. Poll `GET /api/operations/:id`.
 
 ## Work entity actions (agent + Drive via OpenClaw)
 

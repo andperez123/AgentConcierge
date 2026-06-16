@@ -285,6 +285,23 @@ export interface VoiceCommandResponse {
   at: string;
 }
 
+export interface AgentChatTurn {
+  role: "user" | "agent";
+  text: string;
+}
+
+export interface AgentChatBody {
+  text: string;
+  history?: AgentChatTurn[];
+}
+
+export interface AgentChatResponse {
+  ok: boolean;
+  reply: string;
+  mock?: boolean;
+  at: string;
+}
+
 export type WeatherIcon =
   | "clear"
   | "partly_cloudy"
@@ -324,6 +341,69 @@ export interface Note {
   context?: WorkContext;
 }
 
+export interface CalendarEvent {
+  /** Concierge-local id (stable across syncs when googleId matches). */
+  id: string;
+  /** Source Google Calendar event id, used to de-duplicate on sync. */
+  googleId?: string;
+  /** Source Google calendar id (e.g. "primary"). */
+  calendarId?: string;
+  title: string;
+  description?: string;
+  location?: string;
+  /** ISO start. For all-day events this is a YYYY-MM-DD date. */
+  start: string;
+  /** ISO end (exclusive for all-day). Optional for point-in-time events. */
+  end?: string;
+  allDay?: boolean;
+  /** Google event status: confirmed | tentative | cancelled. */
+  status?: string;
+  /** Link back to the event in Google Calendar. */
+  htmlLink?: string;
+  /** Optional display color (hex or Google colorId). */
+  color?: string;
+  /** Where this row came from: google | agent | dashboard. */
+  source?: string;
+  updatedAt: string;
+}
+
+export interface CalendarEventInput {
+  googleId?: string;
+  calendarId?: string;
+  title: string;
+  description?: string;
+  location?: string;
+  start: string;
+  end?: string;
+  allDay?: boolean;
+  status?: string;
+  htmlLink?: string;
+  color?: string;
+  source?: string;
+}
+
+export interface SyncCalendarEventsBody {
+  events: CalendarEventInput[];
+  /**
+   * When set, all existing google-sourced events whose start falls in
+   * [start, end) are removed before the new events are inserted, so a window
+   * can be re-synced cleanly without leaving stale/cancelled events behind.
+   */
+  replaceRange?: { start: string; end: string };
+}
+
+export interface CalendarEventsResponse {
+  events: CalendarEvent[];
+  lastSyncAt?: string;
+}
+
+export interface CalendarSyncResponse {
+  ok: boolean;
+  message: string;
+  at: string;
+  operationId?: string;
+}
+
 export type DeskListStatus = "active" | "completed";
 
 export interface DeskSummary {
@@ -337,6 +417,7 @@ export const KIOSK_DESK_ROUTES = {
   reminders: "/reminders",
   notes: "/notes",
   work: "/work",
+  calendar: "/calendar",
   reminderDetail: (id: number) => `/reminders/${id}`,
   noteDetail: (id: number) => `/notes/${id}`,
 } as const;
@@ -348,6 +429,9 @@ export function isAllowedKioskRoute(route: string): boolean {
   try {
     const url = new URL(trimmed, "http://local");
     if (url.pathname === "/") return url.search === "";
+    if (url.pathname === "/calendar") {
+      return url.search === "" || /^\?month=\d{4}-\d{2}$/.test(url.search);
+    }
     if (url.pathname === "/reminders") return url.search === "";
     if (/^\/reminders\/\d+$/.test(url.pathname)) return url.search === "";
     if (url.pathname === "/notes") return url.search === "";

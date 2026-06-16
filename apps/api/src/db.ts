@@ -92,6 +92,25 @@ db.exec(`
     breakdown_json TEXT,
     updated_at TEXT NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS calendar_events (
+    id TEXT PRIMARY KEY,
+    google_id TEXT,
+    calendar_id TEXT,
+    title TEXT NOT NULL,
+    description TEXT,
+    location TEXT,
+    start_at TEXT NOT NULL,
+    end_at TEXT,
+    all_day INTEGER NOT NULL DEFAULT 0,
+    status TEXT,
+    html_link TEXT,
+    color TEXT,
+    source TEXT,
+    updated_at TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_calendar_start ON calendar_events(start_at);
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_calendar_google
+    ON calendar_events(google_id) WHERE google_id IS NOT NULL;
 `);
 
 function migrateSchema(): void {

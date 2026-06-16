@@ -1,7 +1,8 @@
 import { Link, useLocation } from "react-router-dom";
 import {
   Home,
-  Calendar,
+  CalendarDays,
+  ListChecks,
   Briefcase,
   Mic,
   Settings,
@@ -27,21 +28,23 @@ export default function BottomNav({ state: _state }: Props) {
           ? pathname === "/work" ||
             pathname.startsWith("/projects/") ||
             pathname === "/notes" ||
-            pathname.startsWith("/notes/") ||
-            pathname === "/reminders" ||
-            pathname.startsWith("/reminders/")
+            pathname.startsWith("/notes/")
           : pathname === path || pathname.startsWith(`${path}/`);
     return `bottom-nav__item${active ? " bottom-nav__item--active" : ""}`;
   }
 
   return (
-    <nav className="bottom-nav" aria-label="Main">
+    <nav className="bottom-nav bottom-nav--6" aria-label="Main">
       <Link to="/" className={navClass("/")}>
         <Home strokeWidth={2} />
         <span>Home</span>
       </Link>
+      <Link to="/calendar" className={navClass("/calendar")}>
+        <CalendarDays strokeWidth={2} />
+        <span>Calendar</span>
+      </Link>
       <Link to="/reminders" className={navClass("/reminders")}>
-        <Calendar strokeWidth={2} />
+        <ListChecks strokeWidth={2} />
         <span>{goalsLabel}</span>
       </Link>
       <Link to="/task/voice" className="bottom-nav__fab" aria-label="Voice">
