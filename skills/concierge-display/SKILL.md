@@ -5,9 +5,20 @@ description: Control the Concierge desk kiosk on localhost:3080 — reminders, n
 
 # Concierge display surface
 
-Use this skill when the user should see something on the **physical Concierge screen** (7" kiosk at 1024×600), not only in chat.
+You **own** the Concierge desk kiosk (7" display at 1024×600). Any operator intent that creates or changes a task, note, calendar event, or status **must** be reflected on the kiosk by default. The operator never has to say "edit the dashboard" — that is your default job.
 
 Concierge API base: `http://127.0.0.1:3080/api`
+
+## Default behavior
+
+After every mutation, follow this checklist:
+
+1. Perform the data change via HTTP (reminders, notes, calendar events, alerts, hero, etc.).
+2. Always `POST /api/dashboard/commands` with a **toast** so the operator sees feedback.
+3. **Navigate** to the relevant screen when helpful (`/calendar`, `/reminders/<id>`, etc.).
+4. End voice/chat replies with the **Voice result block** (see below).
+
+Never only reply in chat when the kiosk should show the outcome.
 
 ## When to use what
 
@@ -27,7 +38,7 @@ Concierge API base: `http://127.0.0.1:3080/api`
 | Agent action on reminder/note/project | `POST /api/work/:kind/:id/actions` |
 | Read the desk calendar | `GET /api/calendar/events?from=&to=` |
 | Add a desk calendar event | `POST /api/calendar/events` (single event body) |
-| Optional: pull Google Calendar | `POST /api/calendar/sync` then push via bulk `POST /api/calendar/events` |
+| Rare admin-only sync | `POST /api/calendar/sync` then push via bulk `POST /api/calendar/events` |
 | Google auth status (display) | `GET /api/openclaw/google/status` |
 | Google reauth (Pi / Drive) | `POST /api/openclaw/google/reauth` |
 
@@ -126,7 +137,7 @@ END_VOICE_RESULT_JSON
 | "Edit note 3: …" | `PATCH /api/notes/3` + `navigateTo: "/notes/3"` |
 | "Add calendar event …" / "Schedule …" | `POST /api/calendar/events` + toast; `navigateTo: "/calendar"` |
 | "What's on my calendar?" | `GET /api/calendar/events`, summarize upcoming |
-| "Sync Google calendar" (optional) | `POST /api/calendar/sync`, then push events back |
+| "Sync Google calendar" (admin only) | `POST /api/calendar/sync`, then push events back — only when operator explicitly says Google |
 | "List projects" | `GET /api/projects`, summarize in `spokenReply` |
 | "Add reminder for revenue-factory: …" | `POST /api/reminders` with `projectId: "revenue-factory"` |
 
@@ -259,13 +270,13 @@ Voice: `navigateTo: "/projects/novapay"` after summarizing; `GET /api/dashboard/
 
 When the operator starts a **new startup/idea project**, ask for: slug, display name, vision, status, task breakdown, and next focus — then write `OVERVIEW.md` + `TASKS.md` and link time-bound work via `POST /api/reminders` with `projectId`.
 
-## Calendar (desk + optional Google)
+## Calendar (local-first desk calendar)
 
-The kiosk **Calendar** screen (`/calendar`) is a **local desk calendar** stored in Concierge SQLite. You do **not** need Google Calendar — the operator can add events on the kiosk (+ button or day sheet), and you can add events via API or voice.
+The kiosk **Calendar** screen (`/calendar`) is a **local-first desk calendar** stored in Concierge SQLite. It renders, creates, deletes, and refreshes events **without Google auth**. You fully control it via API and voice — add, read, and delete events on the operator's behalf.
 
-**Optional:** pull the operator's Google Calendar with `POST /api/calendar/sync` (requires your connected Google account with Calendar access). Google events appear alongside desk events; re-sync replaces only the Google-sourced window.
+There is **no PATCH** for calendar events. To change an event: `DELETE /api/calendar/events/:id` then create a new one.
 
-### Desk events (no Google required)
+### Desk events (default path)
 
 ```bash
 # Read events (ISO bounds optional)
@@ -288,10 +299,14 @@ curl -s -X POST http://127.0.0.1:3080/api/dashboard/commands \
   -d '{"type":"navigate","route":"/calendar"}'
 ```
 
-### Optional Google sync
+After create/delete, POST a toast and navigate to `/calendar` (or `/calendar?month=YYYY-MM`).
 
-1. Operator taps **Google** on the calendar screen (or you call `POST /api/calendar/sync`).
-2. You list Google Calendar events for the window using your Google account.
+### Rare admin-only sync
+
+Do **not** mention or use Google sync unless the operator explicitly says Google. This is an admin-only path, not a normal calendar workflow.
+
+1. Operator explicitly asks to sync Google Calendar (or you are performing a rare admin import).
+2. Call `POST /api/calendar/sync`, then list Google Calendar events for the window using your connected Google account.
 3. POST them back with `replaceRange` so stale Google events are cleared.
 
 ```bash

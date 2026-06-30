@@ -24,6 +24,14 @@ describe("buildVoiceAgentMessage", () => {
     assert.match(msg, /Desk summary:/);
     assert.match(msg, /Recently completed reminders/);
   });
+
+  it("includes local calendar instructions for schedule commands", () => {
+    const msg = buildVoiceAgentMessage("schedule dentist tomorrow");
+    assert.match(msg, /\/api\/calendar\/events/);
+    assert.match(msg, /local SQLite events/i);
+    assert.match(msg, /POST a toast and navigate/i);
+    assert.doesNotMatch(msg, /pull Google Calendar|Google sync optional|last Google sync/i);
+  });
 });
 
 describe("buildChatAgentMessage", () => {
@@ -36,6 +44,14 @@ describe("buildChatAgentMessage", () => {
     assert.match(msg, /Operator: hi/);
     assert.match(msg, /Agent: How can I help/);
     assert.match(msg, /VOICE_RESULT_JSON:/);
+  });
+
+  it("includes local calendar instructions for schedule commands", () => {
+    const msg = buildChatAgentMessage("schedule dentist tomorrow");
+    assert.match(msg, /\/api\/calendar\/events/);
+    assert.match(msg, /local SQLite events/i);
+    assert.match(msg, /POST a toast and navigate/i);
+    assert.doesNotMatch(msg, /pull Google Calendar|Google sync optional|last Google sync/i);
   });
 });
 

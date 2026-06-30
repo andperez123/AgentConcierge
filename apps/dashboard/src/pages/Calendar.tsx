@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   CalendarDays,
@@ -6,7 +6,6 @@ import {
   ChevronRight,
   MapPin,
   Plus,
-  RefreshCw,
   Trash2,
   X,
 } from "lucide-react";
@@ -19,8 +18,6 @@ import {
   createCalendarEvent,
   deleteCalendarEvent,
   fetchCalendarEvents,
-  fetchOperation,
-  syncCalendar,
 } from "../api";
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -65,7 +62,7 @@ function eventDayKeys(ev: CalendarEvent): string[] {
   const end = toDate(ev.end);
   if (Number.isNaN(end.getTime())) return keys;
 
-  // All-day end dates are exclusive in Google Calendar.
+  // All-day end dates are exclusive (Google-style).
   const last = new Date(end);
   if (ev.allDay) last.setDate(last.getDate() - 1);
 
@@ -94,20 +91,8 @@ function formatMonthLabel(d: Date): string {
   return d.toLocaleDateString(undefined, { month: "long", year: "numeric" });
 }
 
-function formatLastSync(iso?: string): string {
-  if (!iso) return "Google not synced";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "Google not synced";
-  return `Google synced ${d.toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  })}`;
-}
-
-function isGoogleEvent(ev: CalendarEvent): boolean {
-  return ev.source === "google" || Boolean(ev.googleId);
+function formatMonthEventSubtitle(count: number): string {
+  return `${count} event${count === 1 ? "" : "s"} this month`;
 }
 
 export default function Calendar() {
@@ -116,13 +101,9 @@ export default function Calendar() {
     () => parseMonthParam(params.get("month")) ?? new Date(),
   );
   const [events, setEvents] = useState<CalendarEvent[]>([]);
-  const [lastSyncAt, setLastSyncAt] = useState<string | undefined>();
-  const [syncing, setSyncing] = useState(false);
-  const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [composerDay, setComposerDay] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const todayKey = useMemo(() => dayKey(new Date()), []);
 
@@ -149,7 +130,6 @@ export default function Calendar() {
     try {
       const data = await fetchCalendarEvents(gridRange);
       setEvents(data.events);
-      setLastSyncAt(data.lastSyncAt);
     } catch {
       setEvents([]);
     }
@@ -170,12 +150,6 @@ export default function Calendar() {
     }
     return () => es?.close();
   }, [load]);
-
-  useEffect(() => {
-    return () => {
-      if (pollRef.current) clearTimeout(pollRef.current);
-    };
-  }, []);
 
   const eventsByDay = useMemo(() => {
     const map = new Map<string, CalendarEvent[]>();
@@ -214,61 +188,6 @@ export default function Calendar() {
     const now = new Date();
     changeMonth(new Date(now.getFullYear(), now.getMonth(), 1));
   };
-
-  const pollOperation = useCallback(
-    (operationId: string) => {
-      let attempts = 0;
-      const tick = async () => {
-        attempts += 1;
-        try {
-          const op = await fetchOperation(operationId);
-          if (
-            op.state === "succeeded" ||
-            op.state === "failed" ||
-            op.state === "timed_out" ||
-            op.state === "canceled"
-          ) {
-            setSyncing(false);
-            setSyncMessage(
-              op.state === "succeeded"
-                ? (op.message ?? "Calendar synced")
-                : (op.message ?? "Sync failed"),
-            );
-            await load();
-            return;
-          }
-        } catch {
-          /* keep polling */
-        }
-        if (attempts < 60) {
-          pollRef.current = setTimeout(() => void tick(), 2000);
-        } else {
-          setSyncing(false);
-          setSyncMessage("Sync is taking longer than expected.");
-        }
-      };
-      pollRef.current = setTimeout(() => void tick(), 2000);
-    },
-    [load],
-  );
-
-  const handleSync = useCallback(async () => {
-    if (syncing) return;
-    setSyncing(true);
-    setSyncMessage("Pulling from Google Calendar…");
-    try {
-      const res = await syncCalendar({ month: monthParam(monthDate) });
-      if (res.operationId) {
-        pollOperation(res.operationId);
-      } else {
-        setSyncing(false);
-        await load();
-      }
-    } catch (e) {
-      setSyncing(false);
-      setSyncMessage(e instanceof Error ? e.message : "Sync failed");
-    }
-  }, [syncing, monthDate, pollOperation, load]);
 
   const monthEventCount = useMemo(() => {
     const inMonth = new Set<string>();
@@ -318,8 +237,7 @@ export default function Calendar() {
             {formatMonthLabel(monthDate)}
           </h1>
           <span className="calendar-page__sync-label">
-            {syncMessage ??
-              `${monthEventCount} event${monthEventCount === 1 ? "" : "s"} this month · ${formatLastSync(lastSyncAt)}`}
+            {formatMonthEventSubtitle(monthEventCount)}
           </span>
         </div>
         <div className="calendar-page__controls">
@@ -349,19 +267,6 @@ export default function Calendar() {
             onClick={goNext}
           >
             <ChevronRight size={24} />
-          </button>
-          <button
-            type="button"
-            className="calendar-sync-btn"
-            title="Optional: pull events from Google Calendar"
-            onClick={() => void handleSync()}
-            disabled={syncing}
-          >
-            <RefreshCw
-              size={20}
-              className={syncing ? "calendar-sync-btn__spin" : undefined}
-            />
-            <span>{syncing ? "Syncing" : "Google"}</span>
           </button>
         </div>
       </header>
@@ -398,7 +303,7 @@ export default function Calendar() {
                     key={`${ev.id}-${i}`}
                     className={`calendar-chip${
                       ev.allDay ? " calendar-chip--allday" : ""
-                    }${isGoogleEvent(ev) ? " calendar-chip--google" : " calendar-chip--desk"}`}
+                    }`}
                   >
                     {!ev.allDay && (
                       <span className="calendar-chip__time">
@@ -492,9 +397,6 @@ export default function Calendar() {
                     <span className="calendar-event-row__body">
                       <span className="calendar-event-row__title">
                         {ev.title}
-                        {isGoogleEvent(ev) && (
-                          <span className="calendar-event-row__badge">Google</span>
-                        )}
                       </span>
                       {ev.location && (
                         <span className="calendar-event-row__meta">

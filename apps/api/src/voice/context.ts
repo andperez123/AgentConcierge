@@ -8,7 +8,7 @@ import {
   countActiveReminders,
   countCompletedReminders,
 } from "../reminders.js";
-import { getLastSyncAt, listCalendarEvents } from "../calendar/store.js";
+import { listCalendarEvents } from "../calendar/store.js";
 
 const MAX_REMINDERS = 10;
 const MAX_NOTES = 10;
@@ -64,22 +64,59 @@ function formatCalendarTime(start: string, allDay?: boolean): string {
   });
 }
 
-/** Desk calendar: local events plus optional Google sync. */
+/** Local desk calendar stored in SQLite. */
 function buildCalendarContext(): string {
   const now = new Date();
   const from = now.toISOString();
   const to = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
   const events = listCalendarEvents(from, to).slice(0, MAX_CALENDAR_EVENTS);
-  const lastSync = getLastSyncAt();
 
   const lines = events.map(
     (e) =>
-      `- ${formatCalendarTime(e.start, e.allDay)}: ${truncate(e.title, 120)}${e.location ? ` @ ${truncate(e.location, 60)}` : ""}${e.source === "google" ? " (Google)" : ""}`,
+      `- ${formatCalendarTime(e.start, e.allDay)}: ${truncate(e.title, 120)}${e.location ? ` @ ${truncate(e.location, 60)}` : ""}`,
   );
 
-  return `Desk calendar (local SQLite — Google sync optional${lastSync ? `, last Google sync ${lastSync}` : ""}):
+  return `Local desk calendar (SQLite):
 Next 7 days (${events.length} shown):
 ${lines.length ? lines.join("\n") : "(none)"}`;
+}
+
+function buildAgentInstructions(channel: "voice" | "chat"): string {
+  const replyStyle =
+    channel === "voice"
+      ? "- Reply in 1–2 short sentences suitable for text-to-speech."
+      : "- Reply in clear, concise prose (a short paragraph is fine).";
+
+  const detailRouteNote =
+    channel === "voice"
+      ? `- After create/update, POST a toast and navigate to the detail route (${KIOSK_DESK_ROUTES.reminderDetail(0).replace("/0", "/<id>")} or ${KIOSK_DESK_ROUTES.noteDetail(0).replace("/0", "/<id>")}) so the operator sees full context.`
+      : "- After create/update, POST a toast and navigate to the detail route when helpful.";
+
+  const spokenPlaceholder =
+    channel === "voice" ? "what to speak" : "what to show the operator";
+
+  return `Instructions:
+- You control this desk display. Reflect the operator's intent on the kiosk by default — do not wait to be told to update the dashboard. After any create/update/delete, POST a toast and navigate.
+- Perform actions via HTTP (GET/PATCH/DELETE reminders and notes, GET projects, POST /api/dashboard/commands for toast and navigate).
+- For calendar commands, default to local SQLite events (GET/POST/DELETE /api/calendar/events). Do not mention or use Google sync unless the operator explicitly says Google.
+- Use GET /api/reminders/:id or GET /api/notes/:id for full text before editing (list context is truncated).
+- List completed history: GET /api/reminders?status=completed or GET /api/notes?status=completed.
+${replyStyle}
+${detailRouteNote}
+- Destructive: if user gives exact id ("dismiss reminder 4"), execute immediately. If fuzzy ("dismiss the logs reminder"), do NOT delete yet; set pendingAction and ask them to say confirm.
+- Projects cannot be created on disk via API; list/summarize and link reminders/notes with projectId.
+- End EVERY reply with this exact block (valid JSON between markers):
+
+VOICE_RESULT_JSON:
+{
+  "spokenReply": "<${spokenPlaceholder}>",
+  "actionsTaken": ["<e.g. created_reminder>"],
+  "navigateTo": null,
+  "pendingAction": null
+}
+END_VOICE_RESULT_JSON
+
+navigateTo must be null or one of: ${formatAllowedRoutes()} (slug: lowercase letters, numbers, hyphens).`;
 }
 
 export function buildVoiceAgentMessage(userText: string): string {
@@ -143,27 +180,7 @@ ${projectLines.length ? projectLines.join("\n") : "(none)"}
 
 ${buildCalendarContext()}
 
-Instructions:
-- Perform actions via HTTP (GET/PATCH/DELETE reminders and notes, GET projects, POST /api/dashboard/commands for toast and navigate).
-- Desk calendar: GET /api/calendar/events to read. POST /api/calendar/events to add desk events (title, start, optional end/allDay/location). DELETE /api/calendar/events/:id to remove. Navigate to /calendar. Google Calendar is optional — POST /api/calendar/sync only when the operator wants to pull Google events.
-- Use GET /api/reminders/:id or GET /api/notes/:id for full text before editing (list context is truncated).
-- List completed history: GET /api/reminders?status=completed or GET /api/notes?status=completed.
-- Reply in 1–2 short sentences suitable for text-to-speech.
-- After create/update, POST a toast and navigate to the detail route (${KIOSK_DESK_ROUTES.reminderDetail(0).replace("/0", "/<id>")} or ${KIOSK_DESK_ROUTES.noteDetail(0).replace("/0", "/<id>")}) so the operator sees full context.
-- Destructive: if user gives exact id ("dismiss reminder 4"), execute immediately. If fuzzy ("dismiss the logs reminder"), do NOT delete yet; set pendingAction and ask them to say confirm.
-- Projects cannot be created on disk via API; list/summarize and link reminders/notes with projectId.
-- End EVERY reply with this exact block (valid JSON between markers):
-
-VOICE_RESULT_JSON:
-{
-  "spokenReply": "<what to speak>",
-  "actionsTaken": ["<e.g. created_reminder>"],
-  "navigateTo": null,
-  "pendingAction": null
-}
-END_VOICE_RESULT_JSON
-
-navigateTo must be null or one of: ${formatAllowedRoutes()} (slug: lowercase letters, numbers, hyphens).`;
+${buildAgentInstructions("voice")}`;
 }
 
 export interface ChatTurn {
@@ -250,25 +267,7 @@ ${projectLines.length ? projectLines.join("\n") : "(none)"}
 
 ${buildCalendarContext()}
 
-Instructions:
-- Perform actions via HTTP (GET/PATCH/DELETE reminders and notes, GET projects, POST /api/dashboard/commands for toast and navigate).
-- Desk calendar: GET /api/calendar/events to read. POST /api/calendar/events to add desk events (title, start, optional end/allDay/location). DELETE /api/calendar/events/:id to remove. Navigate to /calendar. Google Calendar is optional — POST /api/calendar/sync only when the operator wants to pull Google events.
-- Use GET /api/reminders/:id or GET /api/notes/:id for full text before editing (list context is truncated).
-- Reply in clear, concise prose (a short paragraph is fine).
-- After create/update, POST a toast and navigate to the detail route when helpful.
-- Destructive: if user gives exact id ("dismiss reminder 4"), execute immediately. If fuzzy, set pendingAction and ask them to confirm.
-- End EVERY reply with this exact block (valid JSON between markers):
-
-VOICE_RESULT_JSON:
-{
-  "spokenReply": "<what to show the operator>",
-  "actionsTaken": ["<e.g. created_reminder>"],
-  "navigateTo": null,
-  "pendingAction": null
-}
-END_VOICE_RESULT_JSON
-
-navigateTo must be null or one of: ${formatAllowedRoutes()} (slug: lowercase letters, numbers, hyphens).`;
+${buildAgentInstructions("chat")}`;
 }
 
 export function buildMockChatReply(
